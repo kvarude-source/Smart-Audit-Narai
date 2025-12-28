@@ -11,237 +11,282 @@ import plotly.express as px
 from fpdf import FPDF
 import logging
 
-# ------------------- Logging Setup -------------------
+# ------------------- 1. Logging & Config Setup -------------------
+st.set_page_config(page_title="SMART Audit AI", page_icon="🔍", layout="wide")
+
 logging.basicConfig(
     filename='smart_audit.log',
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
-# ------------------- Session State -------------------
+# ------------------- 2. Session State Initialization -------------------
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 if 'username' not in st.session_state:
     st.session_state.username = ""
-if 'findings_df' not in st.session_state:
-    st.session_state.findings_df = None
 if 'processed_data' not in st.session_state:
+    # เก็บข้อมูลเป็น Tuple: (dataframe_findings, risk_label)
     st.session_state.processed_data = None
+if 'menu_selection' not in st.session_state:
+    st.session_state.menu_selection = "อัปโหลดข้อมูล"
 
-# ------------------- Logo -------------------
-LOGO_URL = "https://via.placeholder.com/150/006400/FFD700?text=PNH"
-
-# ------------------- ML Model -------------------
-def train_ml_model():
-    np.random.seed(42)
-    num_samples = 1000
-    data = pd.DataFrame({
-        'missing_icd10': np.random.randint(0, 2, num_samples),
-        'missing_icd9cm': np.random.randint(0, 2, num_samples),
-        'missing_drug': np.random.randint(0, 2, num_samples),
-        'missing_proc': np.random.randint(0, 2, num_samples),
-        'missing_lab': np.random.randint(0, 2, num_samples),
-        'missing_disease': np.random.randint(0, 2, num_samples),
-        'missing_right': np.random.randint(0, 2, num_samples),
-        'icd_disease_mismatch': np.random.randint(0, 2, num_samples),
-        'drug_proc_mismatch': np.random.randint(0, 2, num_samples),
-        'lab_abnormal': np.random.randint(0, 2, num_samples),
-        'icd9_proc_mismatch': np.random.randint(0, 2, num_samples),
-        'icd10_format_invalid': np.random.randint(0, 2, num_samples),
-        'icd10_duplicated': np.random.randint(0, 2, num_samples),
-        'charge_amount': np.random.uniform(100, 20000, num_samples),
-        'risk': np.random.choice([0, 1, 2], num_samples, p=[0.7, 0.25, 0.05])
-    })
-    X = data.drop('risk', axis=1)
-    y = data['risk']
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-    clf = RandomForestClassifier(n_estimators=200, max_depth=10, random_state=42)
-    clf.fit(X_train, y_train)
-    return clf
+# ------------------- 3. Constants & Resources -------------------
+LOGO_URL = "https://via.placeholder.com/150/006400/FFD700?text=PNH" # สามารถเปลี่ยนเป็น URL โลโก้จริงได้
 
 @st.cache_resource
 def get_ml_model():
-    return train_ml_model()
+    # จำลองการสร้าง Model (ในระบบจริงอาจจะ Load model ที่ train แล้วเข้ามา)
+    np.random.seed(42)
+    num_samples = 1000
+    data = pd.DataFrame({
+        'total_issues': np.random.randint(0, 100, num_samples),
+        'risk_score': np.random.uniform(0, 10, num_samples),
+        'risk_level': np.random.choice([0, 1, 2], num_samples, p=[0.7, 0.25, 0.05]) 
+        # 0=Low, 1=Medium, 2=High
+    })
+    X = data[['total_issues', 'risk_score']]
+    y = data['risk_level']
+    
+    clf = RandomForestClassifier(n_estimators=100, random_state=42)
+    clf.fit(X, y)
+    return clf
 
 ml_model = get_ml_model()
 
-# ------------------- Login Page -------------------
-def login_page():
-    st.markdown("""
-        <style>
-        .login-container {
-            text-align: center;
-            padding: 60px;
-            background: linear-gradient(135deg, #e3f2fd, #bbdefb);
-            border-radius: 15px;
-            box-shadow: 0 8px 16px rgba(0,0,0,0.15);
-            margin: 40px auto;
-            max-width: 500px;
-        }
-        .copyright { text-align: center; margin-top: 50px; color: #666; font-size: 13px; }
-        </style>
-    """, unsafe_allow_html=True)
-
-    st.image(LOGO_URL, width=180)
-    st.markdown('<div class="login-container">', unsafe_allow_html=True)
-    st.title("🔍 SMART Audit AI")
-    st.subheader("ระบบตรวจสอบข้อมูล 52 แฟ้มด้วยปัญญาประดิษฐ์")
-
-    username = st.text_input("👤 ชื่อผู้ใช้", placeholder="เช่น Hosnarai")
-    password = st.text_input("🔒 รหัสผ่าน", type="password")
-
-    if st.button("เข้าสู่ระบบ", use_container_width=True, type="primary"):
-        if username == "Hosnarai" and password == "h15000":
-            st.session_state.logged_in = True
-            st.session_state.username = username
-            logging.info(f"Login success: {username}")
-            st.success("เข้าสู่ระบบสำเร็จ!")
-            time.sleep(1)
-            st.rerun()
-        else:
-            st.error("ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง")
-            logging.warning(f"Login failed: {username}")
-
-    st.markdown('</div>', unsafe_allow_html=True)
-    st.markdown('<div class="copyright">© 2025 COMMIT - SMART Audit AI Version 1.0</div>', unsafe_allow_html=True)
-
-# ------------------- File Processing -------------------
+# ------------------- 4. Helper Functions (Processing) -------------------
 def process_52_files(uploaded_files):
     findings = []
-
+    
+    # Progress Bar UI
     progress_bar = st.progress(0)
     status_text = st.empty()
 
     for idx, file in enumerate(uploaded_files):
         try:
-            # 52 แฟ้มส่วนใหญ่ใช้ encoding TIS-620
+            # อ่านไฟล์ด้วย Encoding ภาษาไทย (TIS-620)
             content = file.read().decode('TIS-620', errors='replace')
             lines = content.splitlines()
+            
             if not lines:
                 continue
+                
             header = lines[0].split('|')
+            # กรองบรรทัดว่างออก
             data = [line.split('|') for line in lines[1:] if line.strip()]
+            
+            # สร้าง DataFrame
             df = pd.DataFrame(data, columns=header)
             df = df.replace('', np.nan)
-
+            
             file_name = file.name.upper()
 
-            # ตัวอย่าง Rule ตรวจสอบ (สามารถเพิ่มได้ตามต้องการ)
+            # --- Rule Logic (ตัวอย่าง) ---
             if 'IPDX.TXT' in file_name:
-                missing_icd10 = df['DIAG'].isna().sum()
-                invalid_format = df['DIAG'].astype(str).apply(
-                    lambda x: pd.notna(x) and not bool(re.match(r'^[A-Z]\d{2}(\.\d{1,4})?$', str(x).strip()))
-                ).sum()
-                duplicated_icd10 = df.duplicated(subset=['HN', 'AN', 'DIAG']).sum()
+                # ตรวจสอบ DIAG ว่าง
+                if 'DIAG' in df.columns:
+                    missing_icd10 = df['DIAG'].isna().sum()
+                    if missing_icd10 > 0:
+                        findings.append({"ประเภทปัญหา": "ICD-10 หาย/ว่าง", "จำนวน": missing_icd10, "แฟ้ม": file_name})
 
-                if missing_icd10 > 0:
-                    findings.append({"ประเภทปัญหา": "ICD-10 หาย/ว่าง", "จำนวน": missing_icd10})
-                if invalid_format > 0:
-                    findings.append({"ประเภทปัญหา": "รูปแบบ ICD-10 ไม่ถูกต้อง", "จำนวน": invalid_format})
-                if duplicated_icd10 > 0:
-                    findings.append({"ประเภทปัญหา": "ICD-10 ซ้ำในผู้ป่วยเดียวกัน", "จำนวน": duplicated_icd10})
+                    # ตรวจสอบรูปแบบ ICD-10 (คร่าวๆ)
+                    invalid_format = df['DIAG'].astype(str).apply(
+                        lambda x: pd.notna(x) and not bool(re.match(r'^[A-Z]\d{2}(\.\d{1,4})?$', str(x).strip()))
+                    ).sum()
+                    if invalid_format > 0:
+                        findings.append({"ประเภทปัญหา": "รูปแบบ ICD-10 ผิด", "จำนวน": invalid_format, "แฟ้ม": file_name})
 
             elif 'CHARGE.TXT' in file_name:
                 if 'AMOUNT' in df.columns:
+                    # แปลงเป็นตัวเลข
                     df['AMOUNT'] = pd.to_numeric(df['AMOUNT'], errors='coerce').fillna(0)
                     high_charge = (df['AMOUNT'] > 100000).sum()
-                    zero_charge = (df['AMOUNT'] == 0).sum()
                     if high_charge > 0:
-                        findings.append({"ประเภทปัญหา": "ค่ารักษาสูงผิดปกติ (>100,000)", "จำนวน": high_charge})
-                    if zero_charge > 0:
-                        findings.append({"ประเภทปัญหา": "ค่ารักษาเป็น 0", "จำนวน": zero_charge})
+                        findings.append({"ประเภทปัญหา": "ค่ารักษาสูงผิดปกติ (>1แสน)", "จำนวน": high_charge, "แฟ้ม": file_name})
 
         except Exception as e:
-            st.error(f"ไฟล์ {file.name} มีปัญหา: {e}")
-
+            st.error(f"Error reading {file.name}: {e}")
+        
+        # Update Progress
         progress_bar.progress((idx + 1) / len(uploaded_files))
-        status_text.text(f"กำลังประมวลผล: {file.name} ({idx+1}/52)")
+        status_text.text(f"กำลังประมวลผล: {file.name}")
 
-    findings_df = pd.DataFrame(findings) if findings else pd.DataFrame(columns=["ประเภทปัญหา", "จำนวน"])
-
-    # ML Risk Prediction (ตัวอย่างง่าย ๆ)
+    # สรุปผล
+    findings_df = pd.DataFrame(findings) if findings else pd.DataFrame(columns=["ประเภทปัญหา", "จำนวน", "แฟ้ม"])
+    
+    # AI Risk Prediction (จำลอง)
     total_issues = findings_df['จำนวน'].sum() if not findings_df.empty else 0
-    feature_vector = np.zeros((1, 14))
-    feature_vector[0, 0] = 1 if total_issues > 50 else 0
-    feature_vector[0, 11] = 1 if "รูปแบบ ICD-10 ไม่ถูกต้อง" in findings_df['ประเภทปัญหา'].values else 0
-    feature_vector[0, 13] = min(total_issues / 1000, 10)
-
-    risk_pred = ml_model.predict(feature_vector)[0]
-    risk_label = ["ต่ำ", "ปานกลาง", "สูง"][risk_pred]
-
+    # สร้าง feature vector ปลอมๆ เพื่อ test model
+    input_vector = np.array([[total_issues, total_issues/10]]) 
+    
+    risk_pred = ml_model.predict(input_vector)[0]
+    risk_mapping = {0: "ต่ำ (Low)", 1: "ปานกลาง (Medium)", 2: "สูง (High)"}
+    risk_label = risk_mapping.get(risk_pred, "Unknown")
+    
+    time.sleep(0.5) # หน่วงเวลาเล็กน้อยให้เห็น progress เต็ม
+    status_text.empty()
+    progress_bar.empty()
+    
     return findings_df, risk_label
 
-# ------------------- Dashboard Page -------------------
-def dashboard_page():
-    st.markdown(f"""
-        <div style='text-align: right; color: #555; margin-bottom: 20px;'>
-            ผู้ใช้: <b>{st.session_state.username}</b> | 
-            เวลา: {datetime.now().strftime("%d/%m/%Y %H:%M")}
-        </div>
-    """, unsafe_allow_html=True)
+# ------------------- 5. Pages -------------------
 
-    st.title("📊 ผลการตรวจสอบข้อมูล 52 แฟ้ม")
-
-    findings_df = st.session_state.processed_data[0]
-    risk_label = st.session_state.processed_data[1]
-
-    col1, col2, col3, col4 = st.columns(4)
-    total_issues = findings_df['จำนวน'].sum() if not findings_df.empty else 0
-    col1.metric("จำนวนปัญหาที่พบ", f"{total_issues:,}")
-    col2.metric("ระดับความเสี่ยงโดยรวม", risk_label)
-    col3.metric("จำนวนแฟ้มที่ตรวจ", "52")
-    col4.metric("สถานะ", "เสร็จสิ้น")
-
-    st.markdown("### รายละเอียดปัญหาที่พบ")
-
-    if not findings_df.empty:
-        fig = px.pie(findings_df, values='จำนวน', names='ประเภทปัญหา',
-                     color_discrete_sequence=px.colors.sequential.Reds,
-                     hole=0.4)
-        fig.update_traces(textposition='inside', textinfo='percent+label')
-        st.plotly_chart(fig, use_container_width=True)
-
-        st.dataframe(findings_df.sort_values('จำนวน', ascending=False)
-                     .style.background_gradient(cmap='Reds'), use_container_width=True)
-    else:
-        st.success("🎉 ไม่พบปัญหาใด ๆ ในข้อมูลที่อัปโหลด!")
-
-    # Export
-    st.markdown("### 📥 ดาวน์โหลดรายงาน")
-    col1, col2 = st.columns(2)
-    with col1:
-        csv = findings_df.to_csv(index=False).encode('utf-8-sig')
-        st.download_button("ดาวน์โหลด CSV", csv, "smart_audit_findings.csv", "text/csv")
-    with col2:
-        buffer = io.BytesIO()
-        pdf = FPDF()
-        pdf.add_page()
-        pdf.add_font("THSarabun", "", "THSarabun.ttf", uni=True)  # ต้องมี font ไทย หรือใช้ Arial
-        pdf.set_font("Arial", size=16)
-        pdf.cell(200, 10, txt="รายงานผลการตรวจสอบ SMART Audit AI", ln=1, align='C')
-        pdf.ln(10)
-        pdf.set_font("Arial", size=12)
-        for _, row in findings_df.iterrows():
-            pdf.cell(200, 10, txt=f"{row['ประเภทปัญหา']}: {row['จำนวน']} รายการ", ln=1)
-        pdf.output(buffer)
-        st.download_button("ดาวน์โหลด PDF", buffer.getvalue(), "smart_audit_report.pdf", "application/pdf")
-
-# ------------------- Upload Page -------------------
-def upload_page():
+def login_page():
     st.markdown("""
         <style>
-        .upload-container {
-            max-width: 800px; margin: 20px auto; padding: 30px;
-            background-color: #f8fff8; border-radius: 15px;
-            box-shadow: 0 6px 12px rgba(0,0,0,0.1);
+        .login-box {
+            padding: 50px; border-radius: 10px;
+            background-color: #f0f2f6; text-align: center;
+            max-width: 500px; margin: 0 auto;
         }
         </style>
     """, unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns([1,2,1])
+    with col2:
+        st.markdown('<div class="login-box">', unsafe_allow_html=True)
+        st.image(LOGO_URL, width=100)
+        st.title("SMART Audit AI")
+        st.subheader("เข้าสู่ระบบตรวจสอบข้อมูล")
+        
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
+        
+        if st.button("Login", use_container_width=True, type="primary"):
+            if username == "Hosnarai" and password == "h15000":
+                st.session_state.logged_in = True
+                st.session_state.username = username
+                logging.info(f"User {username} logged in.")
+                st.success("Login สำเร็จ!")
+                time.sleep(0.5)
+                st.rerun()
+            else:
+                st.error("ชื่อผู้ใช้หรือรหัสผ่านผิดพลาด")
+        
+        st.markdown('</div>', unsafe_allow_html=True)
 
-    st.markdown('<div class="upload-container">', unsafe_allow_html=True)
-    st.header("อัปโหลดไฟล์ 52 แฟ้ม (.txt)")
-    st.info("กรุณาอัปโหลดไฟล์ทั้ง 52 แฟ้มในรูปแบบ .txt (encoding TIS-620)")
+def dashboard_page():
+    st.header("📊 Dashboard ผลการตรวจสอบ")
+    
+    if st.session_state.processed_data is None:
+        st.info("ยังไม่มีข้อมูลผลลัพธ์ กรุณาไปที่เมนู 'อัปโหลดข้อมูล' เพื่อประมวลผลก่อน")
+        return
 
+    findings_df, risk_label = st.session_state.processed_data
+    
+    # Metrics Row
+    c1, c2, c3 = st.columns(3)
+    total_err = findings_df['จำนวน'].sum() if not findings_df.empty else 0
+    c1.metric("จำนวนข้อผิดพลาดทั้งหมด", f"{total_err:,}")
+    c2.metric("ระดับความเสี่ยง (AI)", risk_label, 
+              delta="High Risk" if "สูง" in risk_label else "Normal",
+              delta_color="inverse" if "สูง" in risk_label else "normal")
+    c3.metric("เวลาที่ตรวจสอบ", datetime.now().strftime("%H:%M:%S"))
+
+    st.markdown("---")
+
+    # Charts & Table
+    col1, col2 = st.columns([1, 1])
+    
+    with col1:
+        st.subheader("สัดส่วนปัญหาที่พบ")
+        if not findings_df.empty:
+            fig = px.pie(findings_df, values='จำนวน', names='ประเภทปัญหา', hole=0.4)
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.success("ไม่พบข้อมูลผิดพลาด")
+
+    with col2:
+        st.subheader("ตารางรายละเอียด")
+        if not findings_df.empty:
+            st.dataframe(findings_df, use_container_width=True, height=300)
+        else:
+            st.write("-")
+
+    # Export Section
+    st.markdown("### 📥 Download Reports")
+    if not findings_df.empty:
+        c_down1, c_down2 = st.columns(2)
+        
+        # CSV
+        csv = findings_df.to_csv(index=False).encode('utf-8-sig')
+        c_down1.download_button("Download CSV", csv, "audit_result.csv", "text/csv")
+        
+        # PDF
+        try:
+            pdf = FPDF()
+            pdf.add_page()
+            # หมายเหตุ: หากไม่มีไฟล์ฟอนต์ THSarabun.ttf ในโฟลเดอร์เดียวกันโค้ดจะ Error
+            # ตรงนี้จึงใส่ try/except ไว้เพื่อความปลอดภัยในการรันครั้งแรก
+            try:
+                pdf.add_font('THSarabun', '', 'THSarabun.ttf', uni=True)
+                pdf.set_font('THSarabun', size=16)
+            except:
+                pdf.set_font("Arial", size=12)
+                st.toast("ไม่พบฟอนต์ไทย ใช้ฟอนต์มาตรฐานแทน", icon="⚠️")
+
+            pdf.cell(200, 10, txt="Smart Audit Report", ln=1, align='C')
+            pdf.ln(10)
+            
+            for index, row in findings_df.iterrows():
+                # Encode text เพื่อป้องกัน error หากใช้ Arial กับภาษาไทย
+                txt_line = f"{row['ประเภทปัญหา']} : {row['จำนวน']}"
+                if pdf.font_family == 'Arial':
+                     txt_line = "Error Found (Thai font missing)"
+                pdf.cell(0, 10, txt=txt_line, ln=1)
+                
+            pdf_out = pdf.output(dest='S').encode('latin-1')
+            c_down2.download_button("Download PDF", pdf_out, "audit_report.pdf", "application/pdf")
+        except Exception as e:
+            st.error(f"PDF Generation Error: {e}")
+
+def upload_page():
+    st.header("📂 อัปโหลดข้อมูล 52 แฟ้ม")
+    st.markdown("กรุณาเลือกไฟล์ .txt ที่ต้องการตรวจสอบ (เลือกได้หลายไฟล์พร้อมกัน)")
+    
     uploaded_files = st.file_uploader(
-        "เลือกไฟล์ทั้ง 52 แฟ้ม",
-        type=["txt"],
+        "Upload Files", 
+        type=['txt'], 
+        accept_multiple_files=True
+    )
+    
+    if uploaded_files:
+        st.info(f"เลือกไฟล์แล้วจำนวน: {len(uploaded_files)} ไฟล์")
+        
+        if st.button("🚀 เริ่มประมวลผล (Start Audit)", type="primary"):
+            with st.spinner("AI กำลังทำงาน..."):
+                findings, risk = process_52_files(uploaded_files)
+                st.session_state.processed_data = (findings, risk)
+                st.success("ประมวลผลเสร็จสิ้น!")
+                time.sleep(1)
+                # เปลี่ยนหน้าไป Dashboard อัตโนมัติ (Optional)
+                # st.session_state.menu_selection = "Dashboard Result" 
+                # st.rerun() 
+
+# ------------------- 6. Main App Controller -------------------
+def main():
+    if not st.session_state.logged_in:
+        login_page()
+    else:
+        # Sidebar Menu
+        with st.sidebar:
+            st.image(LOGO_URL, width=100)
+            st.write(f"สวัสดี, **{st.session_state.username}**")
+            st.markdown("---")
+            
+            menu = st.radio("เมนูหลัก", ["อัปโหลดข้อมูล", "Dashboard Result"])
+            
+            st.markdown("---")
+            if st.button("ออกจากระบบ", use_container_width=True):
+                st.session_state.logged_in = False
+                st.session_state.processed_data = None
+                st.rerun()
+
+        # Routing
+        if menu == "อัปโหลดข้อมูล":
+            upload_page()
+        elif menu == "Dashboard Result":
+            dashboard_page()
+
+if __name__ == "__main__":
+    main()
