@@ -10,13 +10,15 @@ import re
 import plotly.express as px
 from fpdf import FPDF
 import logging
-import os
 
-# Setup logging
-logging.basicConfig(filename='smart_audit.log', level=logging.INFO, 
-                    format='%(asctime)s - %(levelname)s - %(message)s')
+# ------------------- Logging Setup -------------------
+logging.basicConfig(
+    filename='smart_audit.log',
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
 
-# Session state initialization
+# ------------------- Session State -------------------
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 if 'username' not in st.session_state:
@@ -26,7 +28,7 @@ if 'findings_df' not in st.session_state:
 if 'processed_data' not in st.session_state:
     st.session_state.processed_data = None
 
-# Logo
+# ------------------- Logo -------------------
 LOGO_URL = "https://via.placeholder.com/150/006400/FFD700?text=PNH"
 
 # ------------------- ML Model -------------------
@@ -67,12 +69,12 @@ ml_model = get_ml_model()
 def login_page():
     st.markdown("""
         <style>
-        .login-container { 
-            text-align: center; 
-            padding: 60px; 
-            background: linear-gradient(135deg, #e3f2fd, #bbdefb); 
-            border-radius: 15px; 
-            box-shadow: 0 8px 16px rgba(0,0,0,0.15); 
+        .login-container {
+            text-align: center;
+            padding: 60px;
+            background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+            border-radius: 15px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.15);
             margin: 40px auto;
             max-width: 500px;
         }
@@ -86,7 +88,7 @@ def login_page():
     st.subheader("ระบบตรวจสอบข้อมูล 52 แฟ้มด้วยปัญญาประดิษฐ์")
 
     username = st.text_input("👤 ชื่อผู้ใช้", placeholder="เช่น Hosnarai")
-    password = st.text_input("🔒 รหัสผ่าน", type="password", placeholder="กรอกรหัสผ่าน")
+    password = st.text_input("🔒 รหัสผ่าน", type="password")
 
     if st.button("เข้าสู่ระบบ", use_container_width=True, type="primary"):
         if username == "Hosnarai" and password == "h15000":
@@ -98,22 +100,22 @@ def login_page():
             st.rerun()
         else:
             st.error("ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง")
-            logging.warning(f"Login failed attempt: {username}")
+            logging.warning(f"Login failed: {username}")
 
     st.markdown('</div>', unsafe_allow_html=True)
     st.markdown('<div class="copyright">© 2025 COMMIT - SMART Audit AI Version 1.0</div>', unsafe_allow_html=True)
 
-# ------------------- File Processing & Rule Engine -------------------
+# ------------------- File Processing -------------------
 def process_52_files(uploaded_files):
-    all_dfs = {}
-    total_records = 0
-    
+    findings = []
+
     progress_bar = st.progress(0)
     status_text = st.empty()
 
     for idx, file in enumerate(uploaded_files):
         try:
-            content = file.read().decode('TIS-620', errors='replace')  # 52 แฟ้มส่วนใหญ่เป็น TIS-620
+            # 52 แฟ้มส่วนใหญ่ใช้ encoding TIS-620
+            content = file.read().decode('TIS-620', errors='replace')
             lines = content.splitlines()
             if not lines:
                 continue
@@ -121,46 +123,125 @@ def process_52_files(uploaded_files):
             data = [line.split('|') for line in lines[1:] if line.strip()]
             df = pd.DataFrame(data, columns=header)
             df = df.replace('', np.nan)
-            
+
             file_name = file.name.upper()
-            all_dfs[file_name] = df
-            total_records += len(df)
-            
+
+            # ตัวอย่าง Rule ตรวจสอบ (สามารถเพิ่มได้ตามต้องการ)
+            if 'IPDX.TXT' in file_name:
+                missing_icd10 = df['DIAG'].isna().sum()
+                invalid_format = df['DIAG'].astype(str).apply(
+                    lambda x: pd.notna(x) and not bool(re.match(r'^[A-Z]\d{2}(\.\d{1,4})?$', str(x).strip()))
+                ).sum()
+                duplicated_icd10 = df.duplicated(subset=['HN', 'AN', 'DIAG']).sum()
+
+                if missing_icd10 > 0:
+                    findings.append({"ประเภทปัญหา": "ICD-10 หาย/ว่าง", "จำนวน": missing_icd10})
+                if invalid_format > 0:
+                    findings.append({"ประเภทปัญหา": "รูปแบบ ICD-10 ไม่ถูกต้อง", "จำนวน": invalid_format})
+                if duplicated_icd10 > 0:
+                    findings.append({"ประเภทปัญหา": "ICD-10 ซ้ำในผู้ป่วยเดียวกัน", "จำนวน": duplicated_icd10})
+
+            elif 'CHARGE.TXT' in file_name:
+                if 'AMOUNT' in df.columns:
+                    df['AMOUNT'] = pd.to_numeric(df['AMOUNT'], errors='coerce').fillna(0)
+                    high_charge = (df['AMOUNT'] > 100000).sum()
+                    zero_charge = (df['AMOUNT'] == 0).sum()
+                    if high_charge > 0:
+                        findings.append({"ประเภทปัญหา": "ค่ารักษาสูงผิดปกติ (>100,000)", "จำนวน": high_charge})
+                    if zero_charge > 0:
+                        findings.append({"ประเภทปัญหา": "ค่ารักษาเป็น 0", "จำนวน": zero_charge})
+
         except Exception as e:
-            st.error(f"ไม่สามารถอ่านไฟล์ {file.name}: {e}")
-            return None, None
+            st.error(f"ไฟล์ {file.name} มีปัญหา: {e}")
 
-        progress = (idx + 1) / len(uploaded_files)
-        progress_bar.progress(progress)
-        status_text.text(f"กำลังโหลดไฟล์: {file.name} ({idx+1}/{len(uploaded_files)})")
+        progress_bar.progress((idx + 1) / len(uploaded_files))
+        status_text.text(f"กำลังประมวลผล: {file.name} ({idx+1}/52)")
 
-    # ตัวอย่างการตรวจสอบ rule เบื้องต้น (สามารถเพิ่มได้มากกว่านี้)
-    findings = []
+    findings_df = pd.DataFrame(findings) if findings else pd.DataFrame(columns=["ประเภทปัญหา", "จำนวน"])
 
-    # ตัวอย่างไฟล์สำคัญ
-    if 'IPDX.TXT' in all_dfs:
-        ipdx = all_dfs['IPDX.TXT']
-        missing_icd10 = ipdx['DIAG'].isna().sum()
-        invalid_icd10 = ipdx['DIAG'].astype(str).apply(lambda x: bool(re.match(r'^[A-Z]\d{2}', x)) == False and pd.notna(x)).sum()
-        findings.append({"ประเภทปัญหา": "ICD-10 หาย", "จำนวน": missing_icd10})
-        findings.append({"ประเภทปัญหา": "รูปแบบ ICD-10 ไม่ถูกต้อง", "จำนวน": invalid_icd10})
+    # ML Risk Prediction (ตัวอย่างง่าย ๆ)
+    total_issues = findings_df['จำนวน'].sum() if not findings_df.empty else 0
+    feature_vector = np.zeros((1, 14))
+    feature_vector[0, 0] = 1 if total_issues > 50 else 0
+    feature_vector[0, 11] = 1 if "รูปแบบ ICD-10 ไม่ถูกต้อง" in findings_df['ประเภทปัญหา'].values else 0
+    feature_vector[0, 13] = min(total_issues / 1000, 10)
 
-    if 'CHARGE.TXT' in all_dfs:
-        charge = all_dfs['CHARGE.TXT']
-        charge['AMOUNT'] = pd.to_numeric(charge.get('AMOUNT', 0), errors='coerce')
-        high_charge = (charge['AMOUNT'] > 100000).sum()
-        findings.append({"ประเภทปัญหา": "ค่ารักษาสูงผิดปกติ (>100,000)", "จำนวน": high_charge})
+    risk_pred = ml_model.predict(feature_vector)[0]
+    risk_label = ["ต่ำ", "ปานกลาง", "สูง"][risk_pred]
 
-    # เพิ่ม rule อื่น ๆ ได้ที่นี่...
+    return findings_df, risk_label
 
-    findings_df = pd.DataFrame(findings)
-    
-    # ML Risk Prediction (ตัวอย่าง)
+# ------------------- Dashboard Page -------------------
+def dashboard_page():
+    st.markdown(f"""
+        <div style='text-align: right; color: #555; margin-bottom: 20px;'>
+            ผู้ใช้: <b>{st.session_state.username}</b> | 
+            เวลา: {datetime.now().strftime("%d/%m/%Y %H:%M")}
+        </div>
+    """, unsafe_allow_html=True)
+
+    st.title("📊 ผลการตรวจสอบข้อมูล 52 แฟ้ม")
+
+    findings_df = st.session_state.processed_data[0]
+    risk_label = st.session_state.processed_data[1]
+
+    col1, col2, col3, col4 = st.columns(4)
+    total_issues = findings_df['จำนวน'].sum() if not findings_df.empty else 0
+    col1.metric("จำนวนปัญหาที่พบ", f"{total_issues:,}")
+    col2.metric("ระดับความเสี่ยงโดยรวม", risk_label)
+    col3.metric("จำนวนแฟ้มที่ตรวจ", "52")
+    col4.metric("สถานะ", "เสร็จสิ้น")
+
+    st.markdown("### รายละเอียดปัญหาที่พบ")
+
     if not findings_df.empty:
-        feature_vector = np.zeros((1, 14))
-        feature_vector[0, 0] = 1 if "ICD-10 หาย" in findings_df['ประเภทปัญหา'].values else 0
-        feature_vector[0, 11] = 1 if "รูปแบบ ICD-10 ไม่ถูกต้อง" in findings_df['ประเภทปัญหา'].values else 0
-        feature_vector[0, 13] = findings_df['จำนวน'].sum() / 1000
-        
-        risk_pred = ml_model.predict(feature_vector)[0]
-        risk_label = ["
+        fig = px.pie(findings_df, values='จำนวน', names='ประเภทปัญหา',
+                     color_discrete_sequence=px.colors.sequential.Reds,
+                     hole=0.4)
+        fig.update_traces(textposition='inside', textinfo='percent+label')
+        st.plotly_chart(fig, use_container_width=True)
+
+        st.dataframe(findings_df.sort_values('จำนวน', ascending=False)
+                     .style.background_gradient(cmap='Reds'), use_container_width=True)
+    else:
+        st.success("🎉 ไม่พบปัญหาใด ๆ ในข้อมูลที่อัปโหลด!")
+
+    # Export
+    st.markdown("### 📥 ดาวน์โหลดรายงาน")
+    col1, col2 = st.columns(2)
+    with col1:
+        csv = findings_df.to_csv(index=False).encode('utf-8-sig')
+        st.download_button("ดาวน์โหลด CSV", csv, "smart_audit_findings.csv", "text/csv")
+    with col2:
+        buffer = io.BytesIO()
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.add_font("THSarabun", "", "THSarabun.ttf", uni=True)  # ต้องมี font ไทย หรือใช้ Arial
+        pdf.set_font("Arial", size=16)
+        pdf.cell(200, 10, txt="รายงานผลการตรวจสอบ SMART Audit AI", ln=1, align='C')
+        pdf.ln(10)
+        pdf.set_font("Arial", size=12)
+        for _, row in findings_df.iterrows():
+            pdf.cell(200, 10, txt=f"{row['ประเภทปัญหา']}: {row['จำนวน']} รายการ", ln=1)
+        pdf.output(buffer)
+        st.download_button("ดาวน์โหลด PDF", buffer.getvalue(), "smart_audit_report.pdf", "application/pdf")
+
+# ------------------- Upload Page -------------------
+def upload_page():
+    st.markdown("""
+        <style>
+        .upload-container {
+            max-width: 800px; margin: 20px auto; padding: 30px;
+            background-color: #f8fff8; border-radius: 15px;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.1);
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    st.markdown('<div class="upload-container">', unsafe_allow_html=True)
+    st.header("อัปโหลดไฟล์ 52 แฟ้ม (.txt)")
+    st.info("กรุณาอัปโหลดไฟล์ทั้ง 52 แฟ้มในรูปแบบ .txt (encoding TIS-620)")
+
+    uploaded_files = st.file_uploader(
+        "เลือกไฟล์ทั้ง 52 แฟ้ม",
+        type=["txt"],
