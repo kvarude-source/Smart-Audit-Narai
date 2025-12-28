@@ -7,7 +7,11 @@ import os
 import io
 import logging
 
-# ตรวจสอบ Library scikit-learn
+# --- Setup & Config ---
+st.set_page_config(page_title="SMART Audit AI", page_icon="🏥", layout="wide")
+logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
+
+# --- Library Checks ---
 try:
     from sklearn.ensemble import RandomForestClassifier
 except ModuleNotFoundError:
@@ -17,67 +21,50 @@ except ModuleNotFoundError:
 from fpdf import FPDF
 import plotly.express as px
 
-# ------------------- 1. Config & Setup -------------------
-st.set_page_config(page_title="SMART Audit AI", page_icon="🏥", layout="wide")
-
-# ตั้งค่า Logging
-logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
-
-# ------------------- 2. CSS Styling (Blue/White Theme) -------------------
+# --- CSS Theme (Blue/White & Layout Fixes) ---
 def apply_theme():
     st.markdown("""
         <style>
-        /* กำหนดพื้นหลังเป็นสีฟ้าอ่อนไล่เฉดขาว */
+        /* พื้นหลังสีฟ้าไล่เฉด */
         .stApp {
             background-image: linear-gradient(to bottom, #E3F2FD, #FFFFFF);
             background-attachment: fixed;
         }
+        /* ปรับสีหัวข้อ */
+        h1, h2, h3 { color: #0D47A1 !important; }
         
-        /* ปรับสีหัวข้อให้เป็นสีน้ำเงินเข้ม */
-        h1, h2, h3 {
-            color: #0D47A1 !important;
-        }
-        
-        /* ปรับแต่งปุ่มกด */
+        /* ปรับปุ่มกด */
         div.stButton > button {
             background-color: #1976D2;
-            color: white;
-            border-radius: 8px;
+            color: white; border-radius: 8px; border: none;
+            padding: 10px 24px;
         }
         div.stButton > button:hover {
             background-color: #1565C0;
-            border-color: #0D47A1;
-        }
-
-        /* ปรับช่อง Input ให้ดูสะอาดตา */
-        .stTextInput > div > div > input {
-            background-color: #FFFFFF;
-            border: 1px solid #90CAF9;
-            color: #333333;
-            border-radius: 5px;
         }
         
-        /* ลบ Padding ด้านบนเพื่อให้ดูสมดุล */
-        .block-container {
-            padding-top: 2rem;
+        /* ปรับ Sidebar */
+        section[data-testid="stSidebar"] {
+            background-color: #0D47A1;
+        }
+        section[data-testid="stSidebar"] h1, 
+        section[data-testid="stSidebar"] span,
+        section[data-testid="stSidebar"] p {
+            color: white !important;
         }
         </style>
     """, unsafe_allow_html=True)
 
-# ------------------- 3. Session State -------------------
-if 'logged_in' not in st.session_state:
-    st.session_state.logged_in = False
-if 'username' not in st.session_state:
-    st.session_state.username = ""
-if 'processed_data' not in st.session_state:
-    st.session_state.processed_data = None
-if 'current_page' not in st.session_state:
-    st.session_state.current_page = "login"
+# --- Session State ---
+if 'logged_in' not in st.session_state: st.session_state.logged_in = False
+if 'username' not in st.session_state: st.session_state.username = ""
+if 'processed_data' not in st.session_state: st.session_state.processed_data = None
+if 'current_page' not in st.session_state: st.session_state.current_page = "login"
 
-# ------------------- 4. Helper Functions -------------------
+# --- Logic Functions ---
 def get_logo():
     if os.path.exists("logo.png"): return "logo.png"
-    elif os.path.exists("logo.jpg"): return "logo.jpg"
+    if os.path.exists("logo.jpg"): return "logo.jpg"
     return "https://via.placeholder.com/150/006400/FFD700?text=SMART+Audit"
 
 LOGO_PATH = get_logo()
@@ -100,131 +87,188 @@ def process_52_files(uploaded_files):
     total = len(uploaded_files)
     
     for idx, file in enumerate(uploaded_files):
+        # Update Progress
         prog = (idx + 1) / total
         progress_bar.progress(prog)
-        status_text.text(f"Processing: {file.name}")
+        status_text.text(f"⏳ กำลังตรวจสอบ: {file.name} ({idx+1}/{total})")
         
         try:
+            # อ่านไฟล์
             content = file.read().decode('TIS-620', errors='replace')
             lines = content.splitlines()
-            if len(lines) < 2: continue
             
-            header = lines[0].split('|')
-            data_rows = [line.split('|') for line in lines[1:] if line.strip()]
-            df = pd.DataFrame(data_rows, columns=header)
-            
-            # Simple Logic Check
-            if 'IPDX' in file.name.upper() and 'DIAG' in df.columns:
-                missing = df[df['DIAG'] == ''].shape[0]
-                if missing > 0:
-                    findings.append({"แฟ้ม": file.name, "เรื่อง": "ICD-10 ว่าง", "จำนวน": missing})
-                    
-        except Exception:
-            pass
+            if len(lines) > 1:
+                header = lines[0].split('|')
+                rows = [line.split('|') for line in lines[1:] if line.strip()]
+                
+                # สร้าง DF โดยระวัง Error เรื่องจำนวน Column ไม่เท่ากัน
+                try:
+                    df = pd.DataFrame(rows, columns=header)
+                except:
+                    # กรณี Header กับข้อมูลไม่ตรงกัน ให้ข้ามไปก่อน หรือตัดส่วนเกิน
+                    df = pd.DataFrame(rows) 
 
+                file_upper = file.name.upper()
+
+                # --- ตัวอย่าง Logic ตรวจสอบ ---
+                # 1. IPDX Check
+                if 'IPDX' in file_upper and 'DIAG' in df.columns:
+                    missing = df[df['DIAG'] == ''].shape[0]
+                    if missing > 0:
+                        findings.append({"แฟ้ม": file_upper, "เรื่อง": "ICD-10 ว่าง", "จำนวน": missing})
+                
+                # 2. CHARGE Check
+                if 'CHARGE' in file_upper and 'AMOUNT' in df.columns:
+                    vals = pd.to_numeric(df['AMOUNT'], errors='coerce').fillna(0)
+                    high = (vals > 200000).sum()
+                    if high > 0:
+                        findings.append({"แฟ้ม": file_upper, "เรื่อง": "ค่ารักษาสูง > 2แสน", "จำนวน": high})
+
+        except Exception as e:
+            # บันทึก Error แต่ไม่ให้โปรแกรมหยุด
+            print(f"Error in {file.name}: {e}")
+            
     progress_bar.empty()
     status_text.empty()
     
+    # สรุปผล
     if not findings:
         return pd.DataFrame(columns=["แฟ้ม", "เรื่อง", "จำนวน"]), "ต่ำ (Low)"
     
-    return pd.DataFrame(findings), "ปานกลาง (Medium)"
+    df_res = pd.DataFrame(findings)
+    risk_score = ml_model.predict([[len(findings), 0.5]])[0]
+    risk_map = {0: "ต่ำ (Low)", 1: "ปานกลาง (Medium)", 2: "สูง (High)"}
+    return df_res, risk_map.get(risk_score, "ไม่ระบุ")
 
-# ------------------- 5. Pages -------------------
+# --- Pages ---
 
 def login_page():
-    # จัด Layout: ใช้ Column บีบหน้าจอให้เนื้อหาอยู่ตรงกลางและไม่กว้างเกินไป
-    # แบ่งอัตราส่วน 1 : 1 : 1 (เนื้อหาอยู่ตรงกลาง 1 ส่วน)
-    col_left, col_center, col_right = st.columns([1, 1, 1]) 
-    
-    with col_center:
+    col1, col2, col3 = st.columns([1, 1, 1])
+    with col2:
         st.markdown("<br><br>", unsafe_allow_html=True)
-        
-        # จัดโลโก้ให้อยู่ตรงกลาง (ใช้ Nested Columns เพื่อความชัวร์)
-        c_logo_1, c_logo_2, c_logo_3 = st.columns([1, 2, 1])
-        with c_logo_2:
+        c_img1, c_img2, c_img3 = st.columns([1, 2, 1])
+        with c_img2:
             st.image(LOGO_PATH, use_container_width=True)
-
-        # หัวข้อ
-        st.markdown("<h1 style='text-align: center;'>SMART Audit AI</h1>", unsafe_allow_html=True)
-        st.markdown("<h4 style='text-align: center; color: #546E7A;'>ระบบตรวจสอบเวชระเบียนอัจฉริยะ</h4>", unsafe_allow_html=True)
-        st.markdown("<br>", unsafe_allow_html=True)
-
-        # ฟอร์ม Login (ไม่มีกล่องขาวพื้นหลังแล้ว)
+            
+        st.markdown("<h2 style='text-align: center;'>SMART Audit AI</h2>", unsafe_allow_html=True)
+        
         with st.form("login_form"):
             usr = st.text_input("Username")
             pwd = st.text_input("Password", type="password")
+            submitted = st.form_submit_button("เข้าสู่ระบบ", type="primary", use_container_width=True)
             
-            st.markdown("<br>", unsafe_allow_html=True)
-            submit = st.form_submit_button("เข้าสู่ระบบ", type="primary", use_container_width=True)
-            
-            if submit:
+            if submitted:
                 if usr.strip() == "Hosnarai" and pwd.strip() == "h15000":
                     st.session_state.logged_in = True
                     st.session_state.username = usr.strip()
                     st.session_state.current_page = "upload"
                     st.rerun()
                 else:
-                    st.error("ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง")
+                    st.error("❌ ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง")
 
 def upload_page():
     st.markdown(f"### 📂 ยินดีต้อนรับคุณ **{st.session_state.username}**")
-    st.info("💡 กรุณาเลือกไฟล์ 52 แฟ้มทั้งหมด แล้วลากลงในกล่องด้านล่างทีเดียว")
+    
+    # Check ถ้าเคย Process ไปแล้วให้แสดงปุ่มไป Dashboard ได้เลย
+    if st.session_state.processed_data is not None:
+        if st.button("📊 ข้อมูลเดิมมีอยู่แล้ว คลิกเพื่อดูผลลัพธ์"):
+            st.session_state.current_page = "dashboard"
+            st.rerun()
+    
+    st.info("💡 เลือกไฟล์ทั้งหมด 52 แฟ้ม แล้วลากลงในกล่องด้านล่างทีเดียว")
     
     uploaded_files = st.file_uploader("", type=["txt"], accept_multiple_files=True)
     
     if uploaded_files:
-        st.success(f"พบไฟล์จำนวน: {len(uploaded_files)} ไฟล์")
-        if st.button("🚀 เริ่มประมวลผล", type="primary"):
-            with st.spinner("กำลังวิเคราะห์ข้อมูล..."):
-                findings, risk = process_52_files(uploaded_files)
-                st.session_state.processed_data = (findings, risk)
-                st.session_state.current_page = "dashboard"
-                time.sleep(0.5)
-                st.rerun()
+        st.success(f"✅ พร้อมตรวจสอบจำนวน: {len(uploaded_files)} ไฟล์")
+        
+        if st.button("🚀 เริ่มประมวลผล (Start Audit)", type="primary"):
+            with st.spinner("กำลังวิเคราะห์ข้อมูล... ห้ามปิดหน้านี้"):
+                try:
+                    findings, risk = process_52_files(uploaded_files)
+                    
+                    # บันทึกสถานะ
+                    st.session_state.processed_data = (findings, risk)
+                    st.session_state.current_page = "dashboard" # สั่งเปลี่ยนหน้า
+                    
+                    st.success("ประมวลผลเสร็จสิ้น! กำลังพาไปหน้าผลลัพธ์...")
+                    time.sleep(1)
+                    st.rerun() # บังคับรีเฟรชทันที
+                    
+                except Exception as e:
+                    st.error(f"เกิดข้อผิดพลาดร้ายแรง: {e}")
 
 def dashboard_page():
-    st.button("⬅️ ตรวจสอบใหม่", on_click=lambda: st.session_state.update(current_page="upload"))
+    # Header
+    c_head1, c_head2 = st.columns([3, 1])
+    with c_head1:
+        st.title("📊 ผลการตรวจสอบ (Dashboard)")
+    with c_head2:
+        if st.button("⬅️ ตรวจสอบใหม่"):
+            st.session_state.current_page = "upload"
+            st.session_state.processed_data = None
+            st.rerun()
+            
     st.markdown("---")
     
-    findings_df, risk = st.session_state.processed_data
-    
-    c1, c2, c3 = st.columns(3)
-    total = findings_df['จำนวน'].sum() if not findings_df.empty else 0
-    c1.metric("ข้อผิดพลาดที่พบ", f"{total:,}")
-    c2.metric("ความเสี่ยง", risk)
-    c3.metric("สถานะ", "✅ เสร็จสิ้น")
-    
-    if not findings_df.empty:
-        c_chart, c_tbl = st.columns([1,1])
-        with c_chart:
-            fig = px.pie(findings_df, values='จำนวน', names='เรื่อง', title="สัดส่วนปัญหา")
-            st.plotly_chart(fig, use_container_width=True)
-        with c_tbl:
-            st.dataframe(findings_df, use_container_width=True)
-            csv = findings_df.to_csv(index=False).encode('utf-8-sig')
-            st.download_button("📥 ดาวน์โหลด CSV", csv, "report.csv", "text/csv")
+    if st.session_state.processed_data:
+        findings_df, risk = st.session_state.processed_data
+        
+        # Metrics
+        m1, m2, m3 = st.columns(3)
+        total = findings_df['จำนวน'].sum() if not findings_df.empty else 0
+        m1.metric("ข้อผิดพลาดที่พบ", f"{total:,} รายการ")
+        m2.metric("ความเสี่ยง (AI)", risk)
+        m3.metric("สถานะ", "Complete")
+        
+        # Details
+        if not findings_df.empty:
+            c_chart, c_tbl = st.columns([1, 1])
+            with c_chart:
+                st.subheader("สัดส่วนปัญหา")
+                fig = px.pie(findings_df, values='จำนวน', names='เรื่อง', hole=0.4)
+                st.plotly_chart(fig, use_container_width=True)
+            
+            with c_tbl:
+                st.subheader("รายการที่พบ")
+                st.dataframe(findings_df, use_container_width=True, height=400)
+                
+                # Download CSV
+                csv = findings_df.to_csv(index=False).encode('utf-8-sig')
+                st.download_button("📥 ดาวน์โหลดรายงาน (CSV)", csv, "report.csv", "text/csv")
+        else:
+            st.success("🎉 สุดยอด! ไม่พบข้อผิดพลาดในแฟ้มข้อมูลชุดนี้")
+            st.balloons()
     else:
-        st.success("ไม่พบข้อผิดพลาด")
+        st.warning("ไม่มีข้อมูล กรุณากลับไปอัปโหลดไฟล์ใหม่")
 
-# ------------------- 6. Main Controller -------------------
+# --- Main Controller ---
 def main():
-    apply_theme() # เรียกใช้ Theme สีฟ้าขาว
+    apply_theme() # เรียกใช้ Theme
     
     if not st.session_state.logged_in:
         login_page()
     else:
+        # Sidebar
         with st.sidebar:
             st.image(LOGO_PATH, width=80)
-            st.write(f"User: {st.session_state.username}")
+            st.markdown(f"User: **{st.session_state.username}**")
+            st.divider()
+            
+            if st.button("📤 หน้าอัปโหลด"):
+                st.session_state.current_page = "upload"
+                st.rerun()
+            if st.button("📊 แดชบอร์ด"):
+                st.session_state.current_page = "dashboard"
+                st.rerun()
+            
             st.divider()
             if st.button("ออกจากระบบ"):
                 st.session_state.clear()
                 st.rerun()
         
-        if st.session_state.current_page == "upload":
-            upload_page()
-        elif st.session_state.current_page == "dashboard":
+        # Router Logic
+        if st.session_state.current_page == "dashboard":
             dashboard_page()
         else:
             upload_page()
