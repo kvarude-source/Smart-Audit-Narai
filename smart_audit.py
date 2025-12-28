@@ -44,6 +44,7 @@ if 'current_page' not in st.session_state: st.session_state.current_page = "logi
 
 # --- Logic Functions ---
 def get_logo():
+    # ลำดับการหา: ไฟล์ png -> jpg -> ลิงก์สำรอง
     if os.path.exists("logo.png"): return "logo.png"
     if os.path.exists("logo.jpg"): return "logo.jpg"
     return "https://via.placeholder.com/150/006400/FFD700?text=SMART+Audit"
@@ -79,10 +80,11 @@ def process_52_files(uploaded_files):
             lines = content.splitlines()
             if len(lines) > 1:
                 sep = '|' if '|' in lines[0] else ','
-                header = [h.strip().upper() for h in lines[0].strip().split(sep)] # บังคับตัวพิมพ์ใหญ่
+                header = [h.strip().upper() for h in lines[0].strip().split(sep)]
                 rows = [line.strip().split(sep) for line in lines[1:] if line.strip()]
                 
                 df = pd.DataFrame(rows)
+                
                 # ปรับ Header ให้ตรง
                 if df.shape[1] == len(header):
                     df.columns = header
@@ -92,26 +94,25 @@ def process_52_files(uploaded_files):
 
                 file_upper = file.name.upper()
                 row_cnt = len(df)
-                logs.append(f"✅ {file.name}: อ่านได้ {row_cnt} บรรทัด | Cols: {list(df.columns[:5])...}")
-
-                # --- กฎการตรวจสอบ (Updated ตาม Logs ของจริง) ---
                 
-                # 1. แฟ้ม DIAGNOSIS (วินิจฉัยโรค) -> เช็ค DIAGCODE
+                # --- แก้ไขจุดที่ Error ตรงนี้ครับ ---
+                col_preview = str(list(df.columns[:5]))
+                logs.append(f"✅ {file.name}: อ่านได้ {row_cnt} บรรทัด | Cols: {col_preview}")
+
+                # --- กฎการตรวจสอบ (Updated) ---
+                
+                # 1. แฟ้ม DIAGNOSIS (วินิจฉัยโรค)
                 if 'DIAGNOSIS' in file_upper or 'IPDX' in file_upper or 'OPDX' in file_upper:
                     target_col = 'DIAGCODE' if 'DIAGCODE' in df.columns else 'DIAG'
                     
                     if target_col in df.columns:
-                        # หาค่าว่าง
                         missing = df[df[target_col] == ''].shape[0]
                         if missing > 0:
-                            findings.append({"แฟ้ม": file.name, "เรื่อง": f"รหัสโรค ({target_col}) เป็นค่าว่าง", "จำนวน": missing})
-                        
-                        # (ตัวอย่าง) หารหัสที่ไม่ถูกต้องตามรูปแบบ
-                        # invalid = df[~df[target_col].str.match(r'^[A-Z]\d', na=False)].shape[0]
+                            findings.append({"แฟ้ม": file.name, "เรื่อง": f"รหัสโรค ({target_col}) ว่าง", "จำนวน": missing})
                     else:
                         logs.append(f"❌ {file.name}: ไม่พบคอลัมน์ DIAGCODE หรือ DIAG")
 
-                # 2. แฟ้ม PROCEDURE (หัตถการ) -> เช็ค PROCEDCODE
+                # 2. แฟ้ม PROCEDURE (หัตถการ)
                 elif 'PROCEDURE' in file_upper or 'OOP' in file_upper:
                     if 'PROCEDCODE' in df.columns:
                         missing = df[df['PROCEDCODE'] == ''].shape[0]
@@ -120,7 +121,7 @@ def process_52_files(uploaded_files):
                     else:
                         logs.append(f"❌ {file.name}: ไม่พบคอลัมน์ PROCEDCODE")
 
-                # 3. แฟ้ม DRUG (ยา) -> เช็ค DIDSTD (รหัสยามาตรฐาน 24 หลัก)
+                # 3. แฟ้ม DRUG (ยา)
                 elif 'DRUG' in file_upper:
                     if 'DIDSTD' in df.columns:
                         missing = df[df['DIDSTD'] == ''].shape[0]
@@ -129,9 +130,8 @@ def process_52_files(uploaded_files):
                     else:
                         logs.append(f"❌ {file.name}: ไม่พบคอลัมน์ DIDSTD")
 
-                # 4. แฟ้ม CHARGE (ค่าใช้จ่าย) -> เช็ค PRICE หรือ COST
+                # 4. แฟ้ม CHARGE (ค่าใช้จ่าย)
                 elif 'CHARGE' in file_upper or 'CHA' in file_upper:
-                    # เช็คหลายชื่อเผื่อไว้
                     price_col = None
                     for c in ['PRICE', 'COST', 'AMOUNT', 'TOTAL']:
                         if c in df.columns:
@@ -140,13 +140,13 @@ def process_52_files(uploaded_files):
                     
                     if price_col:
                         vals = pd.to_numeric(df[price_col], errors='coerce').fillna(0)
-                        high_cost = (vals > 100000).sum() # เกิน 1 แสน
+                        high_cost = (vals > 100000).sum()
                         zero_cost = (vals == 0).sum()
                         
                         if high_cost > 0:
-                            findings.append({"แฟ้ม": file.name, "เรื่อง": f"ค่ารักษาสูงผิดปกติ (>100,000) ในช่อง {price_col}", "จำนวน": high_cost})
+                            findings.append({"แฟ้ม": file.name, "เรื่อง": f"ค่ารักษาสูงผิดปกติ (>100,000)", "จำนวน": high_cost})
                         if zero_cost > 0:
-                            findings.append({"แฟ้ม": file.name, "เรื่อง": f"ค่ารักษาเป็น 0 ในช่อง {price_col}", "จำนวน": zero_cost})
+                            findings.append({"แฟ้ม": file.name, "เรื่อง": f"ค่ารักษาเป็น 0 ({price_col})", "จำนวน": zero_cost})
                     else:
                         logs.append(f"❌ {file.name}: ไม่พบคอลัมน์ PRICE/COST")
 
@@ -159,7 +159,7 @@ def process_52_files(uploaded_files):
     progress_bar.empty()
     status_text.empty()
     
-    # สรุปผลความเสี่ยง
+    # สรุปผล
     risk_label = "ต่ำ (Low)"
     total_issues = sum([f['จำนวน'] for f in findings])
     if total_issues > 100: risk_label = "สูง (High)"
@@ -205,7 +205,7 @@ def upload_page():
     if files:
         st.success(f"✅ พร้อมตรวจสอบ: {len(files)} ไฟล์")
         if st.button("🚀 เริ่มตรวจสอบ (Start Audit)", type="primary"):
-            with st.spinner("AI กำลังวิเคราะห์ข้อมูล 43/52 แฟ้ม..."):
+            with st.spinner("AI กำลังวิเคราะห์ข้อมูล..."):
                 findings, risk, logs = process_52_files(files)
                 st.session_state.processed_data = (findings, risk)
                 st.session_state.debug_logs = logs
