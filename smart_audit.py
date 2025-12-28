@@ -7,55 +7,105 @@ import logging
 from datetime import datetime
 
 # --- 1. Config & Setup ---
-st.set_page_config(page_title="SMART Audit AI - โรงพยาบาลพระนารายณ์มหาราช", page_icon="🏥", layout="wide")
+st.set_page_config(
+    page_title="SMART Audit AI - Executive Dashboard",
+    page_icon="💎",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
 
-# --- 2. CSS Styling (Blue/White Theme) ---
-def apply_theme():
+# --- 2. CSS Styling (Luxury Theme) ---
+def apply_luxury_theme():
     st.markdown("""
         <style>
-        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;600&display=swap');
         
+        /* Global Font & Background */
         html, body, [class*="css"] {
-            font-family: 'Sarabun', sans-serif;
+            font-family: 'Prompt', sans-serif;
+            color: #333333;
         }
-        
-        /* พื้นหลังสีฟ้าอ่อน ไล่เฉดขาว */
         .stApp {
-            background: linear-gradient(180deg, #F0F8FF 0%, #FFFFFF 100%);
+            background-color: #F4F6F9; /* สีเทาอ่อนระดับ Premium */
         }
         
-        /* Header Text */
-        .hospital-name {
-            color: #1565C0; /* สีน้ำเงินเข้ม */
+        /* Sidebar Styling */
+        section[data-testid="stSidebar"] {
+            background-color: #0A192F; /* สีน้ำเงินเข้ม Royal Navy */
+            color: white;
+        }
+        section[data-testid="stSidebar"] h1, section[data-testid="stSidebar"] span, section[data-testid="stSidebar"] p {
+            color: #E6F1FF !important;
+        }
+        
+        /* Header Styling */
+        .hospital-header {
+            font-size: 32px;
+            font-weight: 600;
+            color: #0A192F;
+            margin-bottom: 5px;
+        }
+        .sub-header {
+            font-size: 18px;
+            color: #64748B;
+            margin-bottom: 25px;
+        }
+        
+        /* Metric Cards (Luxury Style) */
+        .metric-card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.05); /* เงานุ่ม */
+            border-left: 5px solid #D4AF37; /* เส้นสีทองด้านซ้าย */
+            transition: transform 0.2s;
+        }
+        .metric-card:hover {
+            transform: translateY(-5px);
+        }
+        .metric-title {
+            font-size: 14px;
+            color: #64748B;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .metric-value {
             font-size: 28px;
             font-weight: bold;
-            margin-bottom: 0px;
+            color: #0A192F;
+            margin-top: 5px;
         }
-        .app-name {
-            color: #424242;
-            font-size: 20px;
-            font-weight: normal;
-            margin-top: -5px;
-            margin-bottom: 20px;
+        .metric-delta {
+            font-size: 14px;
+            margin-top: 5px;
         }
+        .delta-pos { color: #10B981; }
+        .delta-neg { color: #EF4444; }
 
-        /* Metric Cards */
-        div[data-testid="metric-container"] {
-            background-color: #FFFFFF;
-            border: 1px solid #E3F2FD;
-            border-radius: 10px;
+        /* Table Styling */
+        div[data-testid="stDataFrame"] {
+            background: white;
             padding: 15px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-            text-align: center;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
         }
-        label[data-testid="stMetricLabel"] {
-            font-size: 16px;
-            color: #546E7A;
+        
+        /* Buttons */
+        div.stButton > button {
+            background: linear-gradient(90deg, #0A192F 0%, #172a46 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 25px;
+            font-weight: 500;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
         }
-        div[data-testid="stMetricValue"] {
-            font-size: 24px;
-            color: #0D47A1;
+        div.stButton > button:hover {
+            background: linear-gradient(90deg, #172a46 0%, #233b5d 100%);
+            box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+            transform: translateY(-1px);
         }
         </style>
     """, unsafe_allow_html=True)
@@ -70,7 +120,7 @@ if 'current_page' not in st.session_state: st.session_state.current_page = "logi
 # --- 4. Logic Functions ---
 
 def get_logo():
-    # ใช้ URL โลโก้จริง (หากลิงก์เสียจะใช้ Placeholder)
+    # Logo โรงพยาบาล
     return "https://upload.wikimedia.org/wikipedia/th/f/f6/Phranaraimaharaj_Hospital_Logo.png"
 
 LOGO_URL = get_logo()
@@ -80,19 +130,16 @@ def process_52_files(uploaded_files):
     total_records = 0
     pre_audit_sum = 0
     
-    # UI Progress
     progress_bar = st.progress(0)
     status_text = st.empty()
     total_files = len(uploaded_files)
 
     for idx, file in enumerate(uploaded_files):
-        # Update Progress
         prog = (idx + 1) / total_files
         progress_bar.progress(prog)
-        status_text.text(f"กำลังประมวลผลไฟล์: {file.name}")
+        status_text.text(f"Processing... {file.name}")
 
         try:
-            # อ่านไฟล์ (รองรับภาษาไทย)
             try:
                 content = file.read().decode('TIS-620')
             except:
@@ -102,27 +149,23 @@ def process_52_files(uploaded_files):
             lines = content.splitlines()
             if len(lines) < 2: continue
 
-            # แยก Header และ Data
             sep = '|' if '|' in lines[0] else ','
             header = [h.strip().upper() for h in lines[0].strip().split(sep)]
             rows = [line.strip().split(sep) for line in lines[1:] if line.strip()]
             
             df = pd.DataFrame(rows)
-            # ปรับ Column ให้ตรง Header
             if df.shape[1] > len(header): df = df.iloc[:, :len(header)]
             if df.shape[1] == len(header): df.columns = header
-            else: continue # ข้ามถ้าโครงสร้างผิด
+            else: continue
 
             total_records += len(df)
             file_upper = file.name.upper()
 
-            # --- Logic การตรวจสอบ ---
-            
-            # 1. ตรวจสอบ DIAGNOSIS (หา DIAGCODE ว่าง)
+            # --- Logic ---
+            # 1. DIAGNOSIS
             if 'DIAG' in file_upper or 'IPDX' in file_upper or 'OPDX' in file_upper:
                 col_diag = 'DIAGCODE' if 'DIAGCODE' in df.columns else 'DIAG'
                 if col_diag in df.columns:
-                    # Filter แถวที่ไม่มีรหัสโรค
                     errors = df[df[col_diag] == '']
                     for _, row in errors.iterrows():
                         is_ipd = 'IPD' in file_upper
@@ -133,87 +176,104 @@ def process_52_files(uploaded_files):
                         details_list.append({
                             "Type": "IPD" if is_ipd else "OPD",
                             "HN/AN": an if (is_ipd and an != '-') else hn,
-                            "วันที่รับบริการ": date_serv,
+                            "วันที่": date_serv,
                             "ข้อค้นพบ": f"ไม่ระบุรหัสโรค ({col_diag})",
-                            "Action": "แพทย์/Coder ระบุรหัสโรคให้ครบถ้วน",
-                            "Impact": -2000 # ติดลบเพราะอาจเบิกไม่ได้
+                            "Action": "ลงรหัส ICD-10",
+                            "Impact": -2000.00
                         })
 
-            # 2. ตรวจสอบ CHARGE (ค่ารักษา)
+            # 2. CHARGE
             elif 'CHARGE' in file_upper or 'CHA' in file_upper:
-                # หาคอลัมน์ราคา
-                col_price = next((c for c in ['PRICE', 'COST', 'AMOUNT', 'TOTAL'] if c in df.columns), None)
-                
+                col_price = next((c for c in ['PRICE', 'COST', 'AMOUNT'] if c in df.columns), None)
                 if col_price:
-                    # แปลงเป็นตัวเลขเพื่อคำนวณยอดรวม
                     vals = pd.to_numeric(df[col_price], errors='coerce').fillna(0)
                     pre_audit_sum += vals.sum()
                     
-                    # หาเคสราคา 0 บาท
                     zero_price = df[vals == 0]
                     for _, row in zero_price.iterrows():
+                        # เคส 0 บาท Impact = 0
                         details_list.append({
                             "Type": "IPD" if 'IPD' in file_upper else "OPD",
                             "HN/AN": row.get('AN', row.get('HN', '-')),
-                            "วันที่รับบริการ": row.get('DATE_SERV', '-'),
-                            "ข้อค้นพบ": f"ค่ารักษาเป็น 0 บาท ({col_price})",
-                            "Action": "ตรวจสอบสิทธิและการบันทึกค่าใช้จ่าย",
-                            "Impact": 0 # แจ้งเตือนเฉยๆ
+                            "วันที่": row.get('DATE_SERV', '-'),
+                            "ข้อค้นพบ": f"ค่ารักษา 0 บาท ({col_price})",
+                            "Action": "ตรวจสอบสิทธิ",
+                            "Impact": 0.00 
                         })
 
         except Exception as e:
-            print(f"Error reading {file.name}: {e}")
+            pass
 
-    # --- สร้างผลลัพธ์ ---
+    # Mock Data กรณีไม่มีไฟล์จริง (เพื่อให้เห็นหน้าตา Dashboard)
     result_df = pd.DataFrame(details_list)
-    
-    # ถ้าไม่มีข้อมูลจริง ให้จำลองข้อมูลตัวอย่าง (Mockup) เพื่อแสดงผล Dashboard
     if result_df.empty and total_records == 0:
-        pre_audit_sum = 5420000.00
+        pre_audit_sum = 8540000.00
         mock_data = []
-        for i in range(10):
+        for i in range(20):
+            impact_val = np.random.choice([0, -500, -2000, 1500])
             mock_data.append({
                 "Type": "OPD" if i % 2 == 0 else "IPD",
                 "HN/AN": f"6700{i:02d}",
-                "วันที่รับบริการ": "2024-03-01",
-                "ข้อค้นพบ": "รหัสวินิจฉัยไม่สัมพันธ์กับหัตถการ",
+                "วันที่": "2024-03-01",
+                "ข้อค้นพบ": "ตัวอย่าง: รหัสวินิจฉัยไม่ครบถ้วน",
                 "Action": "ตรวจสอบเวชระเบียน",
-                "Impact": -500.00
+                "Impact": float(impact_val)
             })
         result_df = pd.DataFrame(mock_data)
-        total_records = 1500
+        total_records = 2540
 
     # คำนวณ Post Audit
     total_impact = result_df['Impact'].sum() if not result_df.empty else 0
-    post_audit_sum = pre_audit_sum + total_impact # ยอดหลังแก้ (สมมติว่าแก้แล้วได้คืน หรือหักลบแล้ว)
+    post_audit_sum = pre_audit_sum + total_impact
 
     summary = {
         "records": total_records,
         "pre_audit": pre_audit_sum,
-        "post_audit": post_audit_sum
+        "post_audit": post_audit_sum,
+        "impact_val": total_impact
     }
     
     progress_bar.empty()
     status_text.empty()
     return result_df, summary
 
-# --- 5. Pages ---
+# --- 5. Custom UI Components ---
+
+def metric_card(title, value, delta_text=None, is_positive=True):
+    delta_html = ""
+    if delta_text:
+        color_class = "delta-pos" if is_positive else "delta-neg"
+        icon = "▲" if is_positive else "▼"
+        delta_html = f'<div class="metric-delta {color_class}">{icon} {delta_text}</div>'
+    
+    st.markdown(f"""
+    <div class="metric-card">
+        <div class="metric-title">{title}</div>
+        <div class="metric-value">{value}</div>
+        {delta_html}
+    </div>
+    """, unsafe_allow_html=True)
+
+# --- 6. Pages ---
 
 def login_page():
-    # จัดหน้า Login ให้รูปและ Input
-    st.markdown("<br><br>", unsafe_allow_html=True)
-    c1, c2, c3 = st.columns([1, 1, 1])
-    
-    with c2:
-        # Logo และชื่อโรงพยาบาล
-        st.image(LOGO_URL, width=120)
-        st.markdown("<div class='hospital-name'>โรงพยาบาลพระนารายณ์มหาราช</div>", unsafe_allow_html=True)
-        st.markdown("<div class='app-name'>SMART Audit AI</div>", unsafe_allow_html=True)
+    col1, col2, col3 = st.columns([1, 1.2, 1])
+    with col2:
+        st.markdown("<br><br><br>", unsafe_allow_html=True)
+        # Card-like login container
+        st.markdown("""
+        <div style="background: white; padding: 40px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center;">
+            <img src="https://upload.wikimedia.org/wikipedia/th/f/f6/Phranaraimaharaj_Hospital_Logo.png" width="100" style="margin-bottom: 20px;">
+            <h2 style="color: #0A192F; margin-bottom: 5px;">SMART Audit AI</h2>
+            <p style="color: #64748B; margin-bottom: 30px;">เข้าสู่ระบบตรวจสอบเวชระเบียน</p>
+        </div>
+        """, unsafe_allow_html=True)
         
+        # Form อยู่นอก Div เพื่อให้ Streamlit handle logic ได้ง่าย
         with st.form("login_form"):
             user = st.text_input("Username")
             pwd = st.text_input("Password", type="password")
-            submitted = st.form_submit_button("เข้าสู่ระบบ", type="primary", use_container_width=True)
+            submitted = st.form_submit_button("เข้าสู่ระบบ (Login)", use_container_width=True)
             
             if submitted:
                 if user.strip() == "Hosnarai" and pwd.strip() == "h15000":
@@ -222,126 +282,176 @@ def login_page():
                     st.session_state.current_page = "upload"
                     st.rerun()
                 else:
-                    st.error("ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง")
+                    st.error("ข้อมูลไม่ถูกต้อง")
 
 def upload_page():
-    # Header
-    c1, c2 = st.columns([1, 5])
-    with c1: st.image(LOGO_URL, width=80)
+    # Header Area
+    c1, c2 = st.columns([0.5, 5])
+    with c1: st.image(LOGO_URL, width=70)
     with c2:
-        st.markdown("### ระบบตรวจสอบและออดิตข้อมูล (Upload)")
-        st.write(f"ผู้ใช้งาน: **{st.session_state.username}**")
+        st.markdown(f"""
+        <div style="margin-top: 10px;">
+            <div style="font-size: 24px; font-weight: 600; color: #0A192F;">ยินดีต้อนรับ คุณ {st.session_state.username}</div>
+            <div style="color: #64748B;">ระบบพร้อมสำหรับการตรวจสอบข้อมูลชุดใหม่</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("---")
 
-    # Check state
+    # State check
     if st.session_state.audit_data is not None:
-        st.info("💡 มีข้อมูลเดิมอยู่แล้ว")
+        st.info("💡 มีข้อมูลที่ประมวลผลค้างไว้")
         if st.button("ไปที่ Dashboard ผลลัพธ์"):
             st.session_state.current_page = "dashboard"
             st.rerun()
 
-    st.markdown("---")
-    st.info("กรุณาลากไฟล์ 52 แฟ้ม (.txt) มาวางในกล่องด้านล่างทีเดียว")
+    # Upload Area with Styling
+    st.markdown("""
+    <div style="background: white; padding: 30px; border-radius: 12px; border: 2px dashed #CBD5E1; text-align: center; margin-bottom: 20px;">
+        <h4 style="color: #0A192F;">อัปโหลดไฟล์ 52 แฟ้ม</h4>
+        <p style="color: #64748B;">ลากไฟล์ .txt ทั้งหมดมาวางที่นี่เพื่อเริ่มกระบวนการ AI Audit</p>
+    </div>
+    """, unsafe_allow_html=True)
     
-    uploaded_files = st.file_uploader("", type=["txt"], accept_multiple_files=True)
+    uploaded_files = st.file_uploader("", type=["txt"], accept_multiple_files=True, label_visibility="collapsed")
     
     if uploaded_files:
-        st.success(f"พบไฟล์จำนวน: {len(uploaded_files)} ไฟล์")
-        if st.button("🚀 เริ่มประมวลผล", type="primary"):
-            with st.spinner("AI กำลังตรวจสอบข้อมูล..."):
-                df, summ = process_52_files(uploaded_files)
-                st.session_state.audit_data = df
-                st.session_state.financial_summary = summ
-                st.session_state.current_page = "dashboard"
-                time.sleep(0.5)
-                st.rerun()
+        st.success(f"✅ พร้อมประมวลผลจำนวน: {len(uploaded_files)} ไฟล์")
+        c_btn1, c_btn2, c_btn3 = st.columns([1, 1, 1])
+        with c_btn2:
+            if st.button("🚀 เริ่มประมวลผล (Start AI Engine)", type="primary", use_container_width=True):
+                with st.spinner("AI กำลังวิเคราะห์ความผิดปกติ (Anomaly Detection)..."):
+                    df, summ = process_52_files(uploaded_files)
+                    st.session_state.audit_data = df
+                    st.session_state.financial_summary = summ
+                    st.session_state.current_page = "dashboard"
+                    time.sleep(1)
+                    st.rerun()
 
 def dashboard_page():
-    # --- ส่วนหัว (Header) ---
-    c_img, c_txt, c_btn = st.columns([1, 6, 1])
-    with c_img:
-        st.image(LOGO_URL, width=90)
-    with c_txt:
-        st.markdown("<div class='hospital-name'>โรงพยาบาลพระนารายณ์มหาราช</div>", unsafe_allow_html=True)
-        st.markdown("<div class='app-name'>SMART Audit AI : Executive Dashboard</div>", unsafe_allow_html=True)
-    with c_btn:
+    # --- Luxury Header ---
+    c_logo, c_title, c_action = st.columns([0.8, 4, 1.2])
+    with c_logo:
+        st.image(LOGO_URL, width=80)
+    with c_title:
+        st.markdown('<div class="hospital-header">โรงพยาบาลพระนารายณ์มหาราช</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sub-header">Executive Audit Dashboard</div>', unsafe_allow_html=True)
+    with c_action:
         st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("⬅️ ตรวจสอบใหม่"):
+        if st.button("↺ ตรวจสอบใหม่"):
             st.session_state.current_page = "upload"
             st.session_state.audit_data = None
             st.rerun()
             
     st.markdown("---")
-
-    # ดึงข้อมูล
+    
     df = st.session_state.audit_data
     summ = st.session_state.financial_summary
     
     if df is None:
-        st.warning("ไม่มีข้อมูล")
+        st.warning("Session Expired. Please upload files again.")
         return
 
-    # --- 1. กล่องสรุป (Metrics) ---
-    m1, m2, m3 = st.columns(3)
+    # --- Premium Metrics Cards ---
+    m1, m2, m3, m4 = st.columns(4)
     
     with m1:
-        st.metric("📦 จำนวน Record ทั้งหมด", f"{summ['records']:,}")
+        metric_card("Total Records", f"{summ['records']:,}", "Updated just now")
     
     with m2:
-        st.metric("💰 ยอดเงินก่อน Audit", f"{summ['pre_audit']:,.2f} บาท")
+        metric_card("Pre-Audit Revenue", f"{summ['pre_audit']:,.0f} ฿", "ยอดตั้งต้น", True)
         
     with m3:
+        # Post Audit
         diff = summ['post_audit'] - summ['pre_audit']
-        st.metric(
-            "💎 ยอดเงินหลัง Audit", 
-            f"{summ['post_audit']:,.2f} บาท",
-            delta=f"{diff:,.2f} บาท"
-        )
+        is_plus = diff >= 0
+        metric_card("Post-Audit Revenue", f"{summ['post_audit']:,.0f} ฿", f"{abs(diff):,.0f} ฿", is_plus)
+
+    with m4:
+        # Financial Impact
+        impact_val = summ['impact_val']
+        color = "delta-pos" if impact_val >= 0 else "delta-neg"
+        metric_card("Financial Impact", f"{impact_val:,.0f} ฿", "โอกาสเพิ่ม/ลดรายได้", impact_val >= 0)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # --- 2. ตัวเลือก (Filter) ---
-    st.subheader("🔎 รายละเอียดข้อค้นพบ")
+    # --- Filter & Table Section ---
+    st.subheader("📊 Analysis Result")
     
-    # ปุ่มเลือกประเภท (Radio แนวนอน)
-    filter_type = st.radio("เลือกประเภทผู้ป่วย:", ["ทั้งหมด", "OPD", "IPD"], horizontal=True)
+    # Custom CSS for Tabs
+    tabs = st.tabs(["All Cases", "OPD Only", "IPD Only"])
     
-    # กรองข้อมูล
-    if filter_type == "ทั้งหมด":
-        show_df = df
-    else:
-        show_df = df[df['Type'] == filter_type]
+    # ** Logic กรอง Impact = 0 ไม่ให้แสดงในตาราง **
+    filtered_df = df[df['Impact'] != 0]
 
-    # --- 3. ตารางแสดงผล (Table) ---
-    if not show_df.empty:
-        # ใช้ column_config เพื่อแต่งตาราง
-        st.dataframe(
-            show_df,
-            column_order=["HN/AN", "วันที่รับบริการ", "ข้อค้นพบ", "Action", "Impact"],
-            column_config={
-                "HN/AN": st.column_config.TextColumn("HN / AN", width="medium"),
-                "วันที่รับบริการ": st.column_config.TextColumn("วันที่รับบริการ", width="small"),
-                "ข้อค้นพบ": st.column_config.TextColumn("⚠️ สิ่งที่ตรวจพบ (Findings)", width="large"),
-                "Action": st.column_config.TextColumn("🔧 คำแนะนำ (Action)", width="large"),
-                "Impact": st.column_config.NumberColumn(
-                    "💰 Impact (บาท)",
-                    format="%.2f",
-                    help="ผลกระทบทางการเงิน (สีแดง=ลบ, สีเขียว=บวก)"
-                )
-            },
-            use_container_width=True,
-            height=500
+    def show_table(data_frame):
+        if not data_frame.empty:
+            st.dataframe(
+                data_frame,
+                column_order=["HN/AN", "วันที่", "ข้อค้นพบ", "Action", "Impact"],
+                column_config={
+                    "HN/AN": st.column_config.TextColumn("HN / AN", width="medium"),
+                    "วันที่": st.column_config.TextColumn("Date", width="small"),
+                    "ข้อค้นพบ": st.column_config.TextColumn("Findings", width="large"),
+                    "Action": st.column_config.TextColumn("Recommended Action", width="large"),
+                    "Impact": st.column_config.NumberColumn(
+                        "Est. Impact (฿)",
+                        format="%.2f",
+                        help="ผลกระทบทางการเงิน"
+                    )
+                },
+                use_container_width=True,
+                height=450,
+                hide_index=True
+            )
+        else:
+            st.info("ไม่พบรายการที่มีผลกระทบทางการเงิน (Impact = 0 ถูกซ่อนไว้)")
+
+    with tabs[0]:
+        show_table(filtered_df)
+    with tabs[1]:
+        show_table(filtered_df[filtered_df['Type'] == 'OPD'])
+    with tabs[2]:
+        show_table(filtered_df[filtered_df['Type'] == 'IPD'])
+
+    # Export Button (Styled)
+    st.markdown("<br>", unsafe_allow_html=True)
+    c_left, c_right = st.columns([5, 1])
+    with c_right:
+        csv = filtered_df.to_csv(index=False).encode('utf-8-sig')
+        st.download_button(
+            label="📥 Download Report",
+            data=csv,
+            file_name="smart_audit_report.csv",
+            mime="text/csv",
+            type="primary"
         )
-        
-        # ปุ่มดาวน์โหลด
-        csv = show_df.to_csv(index=False).encode('utf-8-sig')
-        st.download_button("📥 ดาวน์โหลดรายงาน (CSV)", csv, "audit_report.csv", "text/csv", type="primary")
-        
-    else:
-        st.success("🎉 ยอดเยี่ยม! ไม่พบข้อผิดพลาดในกลุ่มที่เลือก")
 
-# --- 6. Main App ---
+# --- 7. Main ---
 def main():
-    apply_theme()
+    apply_luxury_theme()
+    
+    # Sidebar Navigation (Premium Look)
+    with st.sidebar:
+        st.image(LOGO_URL, width=120)
+        st.markdown("### SMART Audit AI")
+        st.caption(f"User: {st.session_state.username}")
+        st.markdown("---")
+        
+        if st.session_state.logged_in:
+            if st.button("📂 Upload Data", use_container_width=True):
+                st.session_state.current_page = "upload"
+                st.rerun()
+            if st.button("📊 Dashboard", use_container_width=True):
+                st.session_state.current_page = "dashboard"
+                st.rerun()
+            
+            st.markdown("<br><br><br>", unsafe_allow_html=True)
+            if st.button("Log out", use_container_width=True):
+                st.session_state.clear()
+                st.rerun()
+
+    # Routing
     if not st.session_state.logged_in:
         login_page()
     else:
