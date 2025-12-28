@@ -32,7 +32,7 @@ if 'menu_selection' not in st.session_state:
     st.session_state.menu_selection = "อัปโหลดข้อมูล"
 
 # ------------------- 3. Constants & Resources -------------------
-LOGO_URL = "https://www.kingnaraihospital.go.th/wp-content/uploads/2024/09/Logo-2-1.png" 
+LOGO_URL = "https://github.com/kvarude-source/Smart-Audit-Narai/blob/main/Logo-2-1.png" 
 
 @st.cache_resource
 def get_ml_model():
