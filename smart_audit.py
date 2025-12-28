@@ -75,16 +75,12 @@ if 'current_page' not in st.session_state: st.session_state.current_page = "logi
 def run_ml_anomaly_detection(df, price_col):
     """ใช้ Isolation Forest หาค่าใช้จ่ายที่ผิดปกติ (Anomaly Detection)"""
     try:
-        # เตรียมข้อมูล (เฉพาะที่มีค่าใช้จ่าย > 0)
         data_for_ml = df[df[price_col] > 0][[price_col]].copy()
-        
-        if len(data_for_ml) < 10: return [] # ข้อมูลน้อยไปไม่ทำ ML
+        if len(data_for_ml) < 10: return [] 
 
-        # Initialize Model (Contamination = อัตราส่วนของ Outlier ที่คาดหวัง เช่น 1%)
         clf = IsolationForest(contamination=0.01, random_state=42)
         data_for_ml['anomaly'] = clf.fit_predict(data_for_ml)
         
-        # -1 คือ Anomaly (ผิดปกติ)
         anomalies = data_for_ml[data_for_ml['anomaly'] == -1]
         
         ml_findings = []
@@ -96,11 +92,10 @@ def run_ml_anomaly_detection(df, price_col):
                 "วันที่": original_row.get('DATE_SERV', '-'),
                 "ข้อค้นพบ": f"🤖 AI: ค่ารักษาสูง/ต่ำ ผิดปกติ ({row[price_col]:,.0f})",
                 "Action": "ตรวจสอบความสมเหตุสมผล (Audit)",
-                "Impact": 0.00 # ML เตือนให้ดู อาจไม่ใช่ข้อผิดพลาดเสมอไป
+                "Impact": 0.00 
             })
         return ml_findings
     except Exception as e:
-        print(f"ML Error: {e}")
         return []
 
 def process_52_files(uploaded_files):
@@ -108,17 +103,14 @@ def process_52_files(uploaded_files):
     total_records = 0
     pre_audit_sum = 0
     
-    # Progress Bar UI (1-100%)
     progress_bar = st.progress(0, text="เริ่มการประมวลผล...")
     total_files = len(uploaded_files)
 
     for idx, file in enumerate(uploaded_files):
-        # Update Progress %
         percent = int(((idx + 1) / total_files) * 100)
         progress_bar.progress((idx + 1) / total_files, text=f"กำลังตรวจสอบไฟล์ที่ {idx+1}/{total_files} ({percent}%) : {file.name}")
         
         try:
-            # Read File
             try:
                 content = file.read().decode('TIS-620')
             except:
@@ -133,12 +125,10 @@ def process_52_files(uploaded_files):
             rows = [line.strip().split(sep) for line in lines[1:] if line.strip()]
             
             df = pd.DataFrame(rows)
-            # Safe Column Assignment
             if df.shape[1] > len(header): df = df.iloc[:, :len(header)]
             if df.shape[1] == len(header): df.columns = header
             else: continue
 
-            # Convert Numeric Columns for Logic
             for col in df.columns:
                 if any(x in col for x in ['PRICE', 'COST', 'AMOUNT', 'Pay_Price']):
                      df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
@@ -146,14 +136,8 @@ def process_52_files(uploaded_files):
             total_records += len(df)
             file_upper = file.name.upper()
 
-            # ==========================================
-            # 🧠 RULE-BASED ENGINE (ตรวจสอบตรรกะ)
-            # ==========================================
-
-            # Rule 1: Date Consistency (วันที่จำหน่าย ต้องไม่ก่อน วันที่รับเข้า)
-            if 'DATEADM' in df.columns and 'DATEDSC' in df.columns: # ชื่อย่อตามมาตรฐาน 43 แฟ้ม
-                # แปลงวันที่ (สมมติว่าเป็น YYYYMMDD)
-                # ตรงนี้เขียน Logic คร่าวๆ ถ้าข้อมูลจริงรูปแบบอื่นต้องปรับ
+            # Rule 1: Date Consistency
+            if 'DATEADM' in df.columns and 'DATEDSC' in df.columns: 
                 invalid_dates = df[df['DATEDSC'] < df['DATEADM']]
                 for _, row in invalid_dates.iterrows():
                     details_list.append({
@@ -165,9 +149,8 @@ def process_52_files(uploaded_files):
                         "Impact": 0.00
                     })
 
-            # Rule 2: Discharge Status Conflict (ตาย แต่ผลการรักษาบอก ปกติ)
+            # Rule 2: Discharge Status Conflict
             if 'DISCHS' in df.columns and 'DISCHT' in df.columns:
-                # 8,9 = Dead, 1 = Improved (Code สมมติมาตรฐาน)
                 conflict = df[(df['DISCHS'].isin(['8', '9'])) & (df['DISCHT'] == '1')]
                 for _, row in conflict.iterrows():
                     details_list.append({
@@ -179,7 +162,7 @@ def process_52_files(uploaded_files):
                         "Impact": 0.00
                     })
 
-            # Rule 3: Missing Diagnosis (DIAGNOSIS)
+            # Rule 3: Missing Diagnosis
             if any(k in file_upper for k in ['DIAG', 'IPDX', 'OPDX']):
                 col_diag = 'DIAGCODE' if 'DIAGCODE' in df.columns else 'DIAG'
                 if col_diag in df.columns:
@@ -199,12 +182,11 @@ def process_52_files(uploaded_files):
                             "Impact": -2000.00
                         })
 
-            # Rule 4: Zero Charge (CHARGE)
+            # Rule 4: Zero Charge + ML
             if any(k in file_upper for k in ['CHARGE', 'CHA']):
                 col_price = next((c for c in ['PRICE', 'COST', 'AMOUNT'] if c in df.columns), None)
                 if col_price:
                     pre_audit_sum += df[col_price].sum()
-                    
                     zero_price = df[df[col_price] == 0]
                     for _, row in zero_price.iterrows():
                         details_list.append({
@@ -215,37 +197,29 @@ def process_52_files(uploaded_files):
                             "Action": "ตรวจสอบสิทธิ",
                             "Impact": 0.00
                         })
-
-                    # ==========================================
-                    # 🤖 MACHINE LEARNING ENGINE (Anomaly)
-                    # ==========================================
-                    # ส่ง Dataframe เข้า ML เพื่อหาค่าใช้จ่ายที่ผิดปกติ (Unsupervised)
+                    
+                    # ML Execution
                     ml_results = run_ml_anomaly_detection(df, col_price)
                     details_list.extend(ml_results)
 
         except Exception as e:
             pass
 
-    # Finish Progress
     progress_bar.progress(100, text="ประมวลผลเสร็จสิ้น!")
     time.sleep(0.5)
     progress_bar.empty()
 
-    # Create Result Dataframe
     result_df = pd.DataFrame(details_list)
     
-    # Mock Data Fallback (กรณีทดสอบไม่มีไฟล์)
+    # Mock Data Fallback
     if result_df.empty and total_records == 0:
         pre_audit_sum = 5000000.00
         mock_data = []
-        # Mock Rule Base
         mock_data.append({"Type": "OPD", "HN/AN": "6700123", "วันที่": "2024-03-01", "ข้อค้นพบ": "ไม่ระบุรหัสโรค (DIAGCODE)", "Action": "ลงรหัส ICD-10", "Impact": -2000})
-        # Mock ML
         mock_data.append({"Type": "IPD", "HN/AN": "AN67005", "วันที่": "2024-03-02", "ข้อค้นพบ": "🤖 AI: ค่ารักษาสูงผิดปกติ (350,000)", "Action": "ตรวจสอบ Audit", "Impact": 0})
         result_df = pd.DataFrame(mock_data)
         total_records = 15000
 
-    # Summary
     if not result_df.empty:
         result_df['Impact'] = pd.to_numeric(result_df['Impact'], errors='coerce').fillna(0)
         total_impact = result_df['Impact'].sum()
@@ -296,103 +270,4 @@ def login_page():
                     st.session_state.current_page = "upload"
                     st.rerun()
                 else:
-                    st.error("ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง")
-
-def upload_page():
-    c1, c2 = st.columns([0.5, 5])
-    with c1: st.markdown(LOGO_HTML, unsafe_allow_html=True)
-    with c2:
-        st.markdown(f'<h2 class="hospital-header" style="margin-top:20px;">ยินดีต้อนรับ คุณ {st.session_state.username}</h2>', unsafe_allow_html=True)
-        st.markdown('<p style="color:#64748B;">พร้อมสำหรับการตรวจสอบข้อมูล 52 แฟ้ม</p>', unsafe_allow_html=True)
-    
-    st.markdown("---")
-    
-    if st.session_state.audit_data is not None:
-        if st.button("📊 ไปที่ Dashboard ผลลัพธ์", type="primary"):
-            st.session_state.current_page = "dashboard"
-            st.rerun()
-
-    st.markdown("""
-    <div style="background:white; padding:40px; border-radius:16px; border:2px dashed #CBD5E1; text-align:center; margin:20px 0;">
-        <h4 style="margin:0; color:#0F172A;">📤 อัปโหลดไฟล์ 52 แฟ้ม (.txt)</h4>
-        <p style="color:#64748B; margin-top:5px;">ลากไฟล์ทั้งหมดมาวางที่นี่เพื่อเริ่มกระบวนการ Rule-Base & ML</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    uploaded_files = st.file_uploader("", type=["txt"], accept_multiple_files=True, label_visibility="collapsed")
-    
-    if uploaded_files:
-        st.success(f"✅ พบไฟล์จำนวน: {len(uploaded_files)} ไฟล์")
-        c1, c2, c3 = st.columns([1, 1, 1])
-        with c2:
-            if st.button("🚀 เริ่มประมวลผล (Start Audit)", type="primary", use_container_width=True):
-                df, summ = process_52_files(uploaded_files)
-                st.session_state.audit_data = df
-                st.session_state.financial_summary = summ
-                st.session_state.current_page = "dashboard"
-                st.rerun()
-
-def dashboard_page():
-    c1, c2, c3 = st.columns([0.8, 5, 1.2])
-    with c1: st.markdown(LOGO_HTML, unsafe_allow_html=True)
-    with c2:
-        st.markdown('<h2 class="hospital-header" style="margin-top:10px;">โรงพยาบาลพระนารายณ์มหาราช</h2>', unsafe_allow_html=True)
-        st.markdown('<p class="sub-header">SMART Audit AI : Executive Dashboard</p>', unsafe_allow_html=True)
-    with c3:
-        st.markdown('<div style="margin-top:20px;"></div>', unsafe_allow_html=True)
-        if st.button("⬅️ ตรวจสอบใหม่"):
-            st.session_state.current_page = "upload"
-            st.session_state.audit_data = None
-            st.rerun()
-
-    st.markdown("---")
-    
-    df = st.session_state.audit_data
-    summ = st.session_state.financial_summary
-    
-    if df is None:
-        st.warning("Session Expired.")
-        return
-
-    c1, c2, c3, c4 = st.columns(4)
-    with c1: metric_card("จำนวน Record ทั้งหมด", f"{summ['records']:,}")
-    with c2: metric_card("ยอดเงินก่อน Audit", f"{summ['pre_audit']:,.2f} บาท")
-    with c3:
-        diff = summ['post_audit'] - summ['pre_audit']
-        metric_card("ยอดเงินหลัง Audit", f"{summ['post_audit']:,.2f} บาท", f"{diff:+,.2f} บาท", diff >= 0)
-    with c4:
-        impact = summ['impact_val']
-        metric_card("Financial Impact", f"{impact:,.2f} บาท", "ผลกระทบสุทธิ", impact >= 0)
-
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    st.subheader("🔎 รายละเอียดข้อค้นพบ (Findings)")
-    tabs = st.tabs(["ทั้งหมด (All)", "เฉพาะ OPD", "เฉพาะ IPD", "🤖 AI Detected"])
-    
-    # Filter Data (กรอง Impact = 0 ออก ยกเว้น Tab AI)
-    filtered_df = df[df['Impact'] != 0]
-    ai_df = df[df['Type'] == 'ML_Detected']
-
-    def show_table(data):
-        if not data.empty:
-            cols_cfg = {
-                "HN/AN": st.column_config.TextColumn("HN / AN", width="medium"),
-                "วันที่": st.column_config.TextColumn("วันที่รับบริการ", width="small"),
-                "ข้อค้นพบ": st.column_config.TextColumn("⚠️ สิ่งที่ตรวจพบ", width="large"),
-                "Action": st.column_config.TextColumn("🔧 คำแนะนำ", width="large"),
-                "Impact": st.column_config.NumberColumn("💰 Impact (บาท)", format="%.2f")
-            }
-            st.dataframe(data, column_order=["HN/AN", "วันที่", "ข้อค้นพบ", "Action", "Impact"], column_config=cols_cfg, use_container_width=True, height=500, hide_index=True)
-        else:
-            st.info("ไม่พบรายการ (Impact=0 ถูกซ่อนไว้)")
-
-    with tabs[0]: show_table(filtered_df)
-    with tabs[1]: show_table(filtered_df[filtered_df['Type'] == 'OPD'])
-    with tabs[2]: show_table(filtered_df[filtered_df['Type'] == 'IPD'])
-    with tabs[3]: 
-        st.info("🤖 รายการที่ AI (Isolation Forest) ตรวจพบความผิดปกติของข้อมูล (Anomaly Detection)")
-        show_table(ai_df)
-
-    st.markdown("<br>", unsafe_allow_html=True)
-    csv = df.to_csv(index=False).encode('utf-8-sig')
-    st.download_button("📥 ดาวน์โหลดรายงาน CSV (Full)", csv, "
+                    st.error("ชื่อผู้ใช้หรือร
