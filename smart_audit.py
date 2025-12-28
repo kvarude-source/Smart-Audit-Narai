@@ -27,7 +27,7 @@ def apply_luxury_theme():
             color: #333333;
         }
         .stApp {
-            background-color: #F4F6F9; /* สีเทาอ่อนระดับ Premium */
+            background-color: #F4F6F9; /* พื้นหลังสีเทาอ่อนระดับ Premium */
         }
         
         /* Sidebar Styling */
@@ -107,10 +107,19 @@ def apply_luxury_theme():
             box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
             transform: translateY(-1px);
         }
+        
+        /* Login Box Styling */
+        .login-container {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            text-align: center;
+        }
         </style>
     """, unsafe_allow_html=True)
 
-# --- 3. Session State ---
+# --- 3. Session State Management ---
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 if 'username' not in st.session_state: st.session_state.username = ""
 if 'audit_data' not in st.session_state: st.session_state.audit_data = None
@@ -120,7 +129,7 @@ if 'current_page' not in st.session_state: st.session_state.current_page = "logi
 # --- 4. Logic Functions ---
 
 def get_logo():
-    # Logo โรงพยาบาล
+    # Logo โรงพยาบาล (URL)
     return "https://upload.wikimedia.org/wikipedia/th/f/f6/Phranaraimaharaj_Hospital_Logo.png"
 
 LOGO_URL = get_logo()
@@ -130,16 +139,19 @@ def process_52_files(uploaded_files):
     total_records = 0
     pre_audit_sum = 0
     
+    # UI Progress
     progress_bar = st.progress(0)
     status_text = st.empty()
     total_files = len(uploaded_files)
 
     for idx, file in enumerate(uploaded_files):
+        # Update Progress bar
         prog = (idx + 1) / total_files
         progress_bar.progress(prog)
         status_text.text(f"Processing... {file.name}")
 
         try:
+            # อ่านไฟล์ (รองรับทั้ง TIS-620 และ UTF-8)
             try:
                 content = file.read().decode('TIS-620')
             except:
@@ -147,13 +159,16 @@ def process_52_files(uploaded_files):
                 content = file.read().decode('utf-8', errors='replace')
 
             lines = content.splitlines()
-            if len(lines) < 2: continue
+            if len(lines) < 2: continue # ข้ามไฟล์ว่าง
 
+            # แยก Header และ Data
             sep = '|' if '|' in lines[0] else ','
             header = [h.strip().upper() for h in lines[0].strip().split(sep)]
             rows = [line.strip().split(sep) for line in lines[1:] if line.strip()]
             
             df = pd.DataFrame(rows)
+            
+            # ปรับ Column ให้ตรง Header
             if df.shape[1] > len(header): df = df.iloc[:, :len(header)]
             if df.shape[1] == len(header): df.columns = header
             else: continue
@@ -161,8 +176,8 @@ def process_52_files(uploaded_files):
             total_records += len(df)
             file_upper = file.name.upper()
 
-            # --- Logic ---
-            # 1. DIAGNOSIS
+            # --- Logic การตรวจสอบ ---
+            # 1. DIAGNOSIS (OPD/IPD)
             if 'DIAG' in file_upper or 'IPDX' in file_upper or 'OPDX' in file_upper:
                 col_diag = 'DIAGCODE' if 'DIAGCODE' in df.columns else 'DIAG'
                 if col_diag in df.columns:
@@ -182,7 +197,7 @@ def process_52_files(uploaded_files):
                             "Impact": -2000.00
                         })
 
-            # 2. CHARGE
+            # 2. CHARGE (ค่ารักษา)
             elif 'CHARGE' in file_upper or 'CHA' in file_upper:
                 col_price = next((c for c in ['PRICE', 'COST', 'AMOUNT'] if c in df.columns), None)
                 if col_price:
@@ -202,9 +217,9 @@ def process_52_files(uploaded_files):
                         })
 
         except Exception as e:
-            pass
+            pass # ข้ามไฟล์ที่มีปัญหา เพื่อไม่ให้โปรแกรมหยุด
 
-    # Mock Data กรณีไม่มีไฟล์จริง (เพื่อให้เห็นหน้าตา Dashboard)
+    # Mock Data กรณีไม่มีไฟล์จริง (เพื่อให้เห็นหน้าตา Dashboard ในการทดสอบ)
     result_df = pd.DataFrame(details_list)
     if result_df.empty and total_records == 0:
         pre_audit_sum = 8540000.00
@@ -240,6 +255,7 @@ def process_52_files(uploaded_files):
 # --- 5. Custom UI Components ---
 
 def metric_card(title, value, delta_text=None, is_positive=True):
+    # ฟังก์ชันสร้างการ์ด HTML สวยๆ
     delta_html = ""
     if delta_text:
         color_class = "delta-pos" if is_positive else "delta-neg"
@@ -262,14 +278,14 @@ def login_page():
         st.markdown("<br><br><br>", unsafe_allow_html=True)
         # Card-like login container
         st.markdown("""
-        <div style="background: white; padding: 40px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center;">
+        <div class="login-container">
             <img src="https://upload.wikimedia.org/wikipedia/th/f/f6/Phranaraimaharaj_Hospital_Logo.png" width="100" style="margin-bottom: 20px;">
             <h2 style="color: #0A192F; margin-bottom: 5px;">SMART Audit AI</h2>
             <p style="color: #64748B; margin-bottom: 30px;">เข้าสู่ระบบตรวจสอบเวชระเบียน</p>
         </div>
         """, unsafe_allow_html=True)
         
-        # Form อยู่นอก Div เพื่อให้ Streamlit handle logic ได้ง่าย
+        # Form
         with st.form("login_form"):
             user = st.text_input("Username")
             pwd = st.text_input("Password", type="password")
@@ -370,7 +386,6 @@ def dashboard_page():
     with m4:
         # Financial Impact
         impact_val = summ['impact_val']
-        color = "delta-pos" if impact_val >= 0 else "delta-neg"
         metric_card("Financial Impact", f"{impact_val:,.0f} ฿", "โอกาสเพิ่ม/ลดรายได้", impact_val >= 0)
 
     st.markdown("<br>", unsafe_allow_html=True)
@@ -427,11 +442,11 @@ def dashboard_page():
             type="primary"
         )
 
-# --- 7. Main ---
+# --- 7. Main Controller ---
 def main():
     apply_luxury_theme()
     
-    # Sidebar Navigation (Premium Look)
+    # Sidebar Navigation
     with st.sidebar:
         st.image(LOGO_URL, width=120)
         st.markdown("### SMART Audit AI")
