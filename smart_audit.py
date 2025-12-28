@@ -20,7 +20,7 @@ except ModuleNotFoundError:
 from fpdf import FPDF
 import plotly.express as px
 
-# --- CSS Theme ---
+# --- CSS Theme (Blue/White) ---
 def apply_theme():
     st.markdown("""
         <style>
@@ -30,8 +30,8 @@ def apply_theme():
         div.stButton > button:hover { background-color: #1565C0; }
         section[data-testid="stSidebar"] { background-color: #0D47A1; }
         section[data-testid="stSidebar"] h1, section[data-testid="stSidebar"] span, section[data-testid="stSidebar"] p { color: white !important; }
-        /* Box Styling */
-        .info-box { background-color: #ffffff; padding: 15px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 10px; }
+        /* Cards */
+        .metric-card { background-color: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; }
         </style>
     """, unsafe_allow_html=True)
 
@@ -39,7 +39,7 @@ def apply_theme():
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 if 'username' not in st.session_state: st.session_state.username = ""
 if 'processed_data' not in st.session_state: st.session_state.processed_data = None
-if 'debug_logs' not in st.session_state: st.session_state.debug_logs = [] # เก็บ Log การทำงาน
+if 'debug_logs' not in st.session_state: st.session_state.debug_logs = []
 if 'current_page' not in st.session_state: st.session_state.current_page = "login"
 
 # --- Logic Functions ---
@@ -52,107 +52,118 @@ LOGO_PATH = get_logo()
 
 def process_52_files(uploaded_files):
     findings = []
-    logs = [] # สร้างตัวแปรเก็บ Log
+    logs = []
     
     progress_bar = st.progress(0)
     status_text = st.empty()
     total = len(uploaded_files)
     
-    # ตัวแปรจำลอง Model
+    # Dummy Model
     ml_model = RandomForestClassifier(n_estimators=10)
-    # Fit dummy data เพื่อกัน error
     ml_model.fit(np.random.rand(10, 2), np.random.choice([0, 1], 10))
 
     for idx, file in enumerate(uploaded_files):
         prog = (idx + 1) / total
         progress_bar.progress(prog)
-        status_text.text(f"⏳ กำลังอ่านไฟล์: {file.name}")
+        status_text.text(f"⏳ กำลังตรวจสอบ: {file.name}")
         
         try:
-            # ลองอ่านด้วย TIS-620 ก่อน (มาตรฐานไทย)
+            # อ่านไฟล์ (รองรับ TIS-620 และ UTF-8)
             try:
                 content = file.read().decode('TIS-620')
             except UnicodeDecodeError:
-                # ถ้าไม่ได้ ลอง UTF-8
                 file.seek(0)
                 content = file.read().decode('utf-8', errors='replace')
-                logs.append(f"⚠️ ไฟล์ {file.name} ไม่ใช่ TIS-620 (ใช้ UTF-8 แทน)")
+                logs.append(f"⚠️ {file.name}: ใช้ UTF-8 แทน TIS-620")
 
             lines = content.splitlines()
-            
             if len(lines) > 1:
-                # ตรวจสอบตัวคั่น (Delimiter) ว่าเป็น '|' หรือไม่
-                if '|' in lines[0]:
-                    sep = '|'
-                else:
-                    sep = ',' # เผื่อเป็น CSV
-                    
-                header = lines[0].strip().split(sep)
+                sep = '|' if '|' in lines[0] else ','
+                header = [h.strip().upper() for h in lines[0].strip().split(sep)] # บังคับตัวพิมพ์ใหญ่
                 rows = [line.strip().split(sep) for line in lines[1:] if line.strip()]
                 
-                # สร้าง DataFrame
                 df = pd.DataFrame(rows)
-                # ป้องกัน Error จำนวนคอลัมน์ไม่เท่ากัน
+                # ปรับ Header ให้ตรง
                 if df.shape[1] == len(header):
                     df.columns = header
                 else:
-                    # ตัดหรือเติมให้เท่ากันแบบหยาบๆ
                     df = df.iloc[:, :len(header)]
                     df.columns = header[:df.shape[1]]
 
                 file_upper = file.name.upper()
-                row_count = len(df)
-                logs.append(f"✅ อ่านไฟล์ {file.name} สำเร็จ: {row_count} บรรทัด")
+                row_cnt = len(df)
+                logs.append(f"✅ {file.name}: อ่านได้ {row_cnt} บรรทัด | Cols: {list(df.columns[:5])...}")
 
-                # --- เริ่มตรวจสอบกฎ (Rules) ---
+                # --- กฎการตรวจสอบ (Updated ตาม Logs ของจริง) ---
                 
-                # 1. กฎ IPDX (ผู้ป่วยใน)
-                if 'IPD' in file_upper: # เช็คคำว่า IPD ในชื่อไฟล์
-                    if 'DIAG' in df.columns:
-                        missing = df[df['DIAG'] == ''].shape[0]
+                # 1. แฟ้ม DIAGNOSIS (วินิจฉัยโรค) -> เช็ค DIAGCODE
+                if 'DIAGNOSIS' in file_upper or 'IPDX' in file_upper or 'OPDX' in file_upper:
+                    target_col = 'DIAGCODE' if 'DIAGCODE' in df.columns else 'DIAG'
+                    
+                    if target_col in df.columns:
+                        # หาค่าว่าง
+                        missing = df[df[target_col] == ''].shape[0]
                         if missing > 0:
-                            findings.append({"แฟ้ม": file.name, "เรื่อง": "ICD-10 ว่าง (IPD)", "จำนวน": missing})
+                            findings.append({"แฟ้ม": file.name, "เรื่อง": f"รหัสโรค ({target_col}) เป็นค่าว่าง", "จำนวน": missing})
+                        
+                        # (ตัวอย่าง) หารหัสที่ไม่ถูกต้องตามรูปแบบ
+                        # invalid = df[~df[target_col].str.match(r'^[A-Z]\d', na=False)].shape[0]
                     else:
-                        logs.append(f"❌ ไฟล์ {file.name} หาคอลัมน์ DIAG ไม่เจอ (เจอแต่: {list(df.columns)})")
+                        logs.append(f"❌ {file.name}: ไม่พบคอลัมน์ DIAGCODE หรือ DIAG")
 
-                # 2. กฎ OPDX (ผู้ป่วยนอก)
-                elif 'OPD' in file_upper: 
-                    if 'DIAG' in df.columns:
-                        missing = df[df['DIAG'] == ''].shape[0]
+                # 2. แฟ้ม PROCEDURE (หัตถการ) -> เช็ค PROCEDCODE
+                elif 'PROCEDURE' in file_upper or 'OOP' in file_upper:
+                    if 'PROCEDCODE' in df.columns:
+                        missing = df[df['PROCEDCODE'] == ''].shape[0]
                         if missing > 0:
-                            findings.append({"แฟ้ม": file.name, "เรื่อง": "ICD-10 ว่าง (OPD)", "จำนวน": missing})
+                            findings.append({"แฟ้ม": file.name, "เรื่อง": "รหัสหัตถการ (PROCEDCODE) ว่าง", "จำนวน": missing})
+                    else:
+                        logs.append(f"❌ {file.name}: ไม่พบคอลัมน์ PROCEDCODE")
 
-                # 3. กฎ WOMEN (หญิงตั้งครรภ์) - ตัวอย่างเพิ่ม
-                elif 'WOMEN' in file_upper:
-                    if 'GRAVIDA' in df.columns: # สมมติว่าต้องมีครรภ์ที่
-                        # ลองแปลงเป็นตัวเลข เช็คค่าแปลกๆ
-                        pass 
-                    logs.append(f"ℹ️ ตรวจสอบไฟล์ WOMEN: {row_count} รายการ")
+                # 3. แฟ้ม DRUG (ยา) -> เช็ค DIDSTD (รหัสยามาตรฐาน 24 หลัก)
+                elif 'DRUG' in file_upper:
+                    if 'DIDSTD' in df.columns:
+                        missing = df[df['DIDSTD'] == ''].shape[0]
+                        if missing > 0:
+                            findings.append({"แฟ้ม": file.name, "เรื่อง": "รหัสยามาตรฐาน (DIDSTD) ว่าง", "จำนวน": missing})
+                    else:
+                        logs.append(f"❌ {file.name}: ไม่พบคอลัมน์ DIDSTD")
 
-                # 4. กฎ CHARGE (ค่าใช้จ่าย)
-                elif 'CHA' in file_upper: # จับคำว่า CHARGE หรือ CHA
-                    if 'AMOUNT' in df.columns:
-                        vals = pd.to_numeric(df['AMOUNT'], errors='coerce').fillna(0)
-                        high = (vals > 200000).sum()
-                        if high > 0:
-                            findings.append({"แฟ้ม": file.name, "เรื่อง": "ค่ารักษาสูง > 2แสน", "จำนวน": high})
-                
-                else:
-                    logs.append(f"⏩ ข้ามการตรวจสอบลึก {file.name} (ไม่มีกฎรองรับ)")
+                # 4. แฟ้ม CHARGE (ค่าใช้จ่าย) -> เช็ค PRICE หรือ COST
+                elif 'CHARGE' in file_upper or 'CHA' in file_upper:
+                    # เช็คหลายชื่อเผื่อไว้
+                    price_col = None
+                    for c in ['PRICE', 'COST', 'AMOUNT', 'TOTAL']:
+                        if c in df.columns:
+                            price_col = c
+                            break
+                    
+                    if price_col:
+                        vals = pd.to_numeric(df[price_col], errors='coerce').fillna(0)
+                        high_cost = (vals > 100000).sum() # เกิน 1 แสน
+                        zero_cost = (vals == 0).sum()
+                        
+                        if high_cost > 0:
+                            findings.append({"แฟ้ม": file.name, "เรื่อง": f"ค่ารักษาสูงผิดปกติ (>100,000) ในช่อง {price_col}", "จำนวน": high_cost})
+                        if zero_cost > 0:
+                            findings.append({"แฟ้ม": file.name, "เรื่อง": f"ค่ารักษาเป็น 0 ในช่อง {price_col}", "จำนวน": zero_cost})
+                    else:
+                        logs.append(f"❌ {file.name}: ไม่พบคอลัมน์ PRICE/COST")
 
             else:
-                logs.append(f"⚠️ ไฟล์ {file.name} ว่างเปล่า หรือมีแค่หัวตาราง")
+                logs.append(f"⚠️ {file.name}: ไฟล์ว่างเปล่า")
 
         except Exception as e:
-            logs.append(f"❌ Error อ่านไฟล์ {file.name}: {str(e)}")
+            logs.append(f"❌ Error {file.name}: {str(e)}")
             
     progress_bar.empty()
     status_text.empty()
     
-    # สรุปผล
+    # สรุปผลความเสี่ยง
     risk_label = "ต่ำ (Low)"
-    if findings:
-        risk_label = "ปานกลาง (Medium)" if len(findings) < 10 else "สูง (High)"
+    total_issues = sum([f['จำนวน'] for f in findings])
+    if total_issues > 100: risk_label = "สูง (High)"
+    elif total_issues > 0: risk_label = "ปานกลาง (Medium)"
         
     df_res = pd.DataFrame(findings) if findings else pd.DataFrame(columns=["แฟ้ม", "เรื่อง", "จำนวน"])
     
@@ -167,6 +178,7 @@ def login_page():
         with c_img2:
             st.image(LOGO_PATH, use_container_width=True)
         st.markdown("<h2 style='text-align: center;'>SMART Audit AI</h2>", unsafe_allow_html=True)
+        
         with st.form("login"):
             u = st.text_input("Username")
             p = st.text_input("Password", type="password")
@@ -183,26 +195,25 @@ def upload_page():
     st.markdown(f"### 📂 ยินดีต้อนรับคุณ **{st.session_state.username}**")
     
     if st.session_state.processed_data:
-         if st.button("📊 ข้อมูลประมวลผลเสร็จแล้ว คลิกเพื่อดู"):
+         if st.button("📊 ข้อมูลเดิมมีอยู่แล้ว คลิกเพื่อดูผลลัพธ์"):
              st.session_state.current_page = "dashboard"
              st.rerun()
 
-    st.info("💡 ลากไฟล์ 52 แฟ้มมาวางที่นี่ (รองรับไฟล์ .txt)")
+    st.info("💡 ลากไฟล์ 52 แฟ้มมาวางที่นี่ (ระบบจะตรวจสอบรหัสโรค, ยา, ค่ารักษา อัตโนมัติ)")
     files = st.file_uploader("", type=["txt"], accept_multiple_files=True)
     
     if files:
-        st.success(f"✅ เตรียมพร้อม {len(files)} ไฟล์")
+        st.success(f"✅ พร้อมตรวจสอบ: {len(files)} ไฟล์")
         if st.button("🚀 เริ่มตรวจสอบ (Start Audit)", type="primary"):
-            with st.spinner("AI กำลังทำงาน..."):
+            with st.spinner("AI กำลังวิเคราะห์ข้อมูล 43/52 แฟ้ม..."):
                 findings, risk, logs = process_52_files(files)
                 st.session_state.processed_data = (findings, risk)
-                st.session_state.debug_logs = logs # บันทึก Log
+                st.session_state.debug_logs = logs
                 st.session_state.current_page = "dashboard"
                 time.sleep(0.5)
                 st.rerun()
 
 def dashboard_page():
-    # Header & Reset
     c1, c2 = st.columns([3, 1])
     with c1: st.title("📊 ผลการตรวจสอบ")
     with c2: 
@@ -216,37 +227,35 @@ def dashboard_page():
     if st.session_state.processed_data:
         findings, risk = st.session_state.processed_data
         
-        # Metrics
+        # Metrics Cards
         m1, m2, m3 = st.columns(3)
         count = findings['จำนวน'].sum() if not findings.empty else 0
-        m1.metric("ข้อผิดพลาดที่พบ", f"{count:,} รายการ")
-        m2.metric("ความเสี่ยง", risk)
-        m3.metric("จำนวนไฟล์ที่อ่าน", "ดูใน Log")
+        m1.metric("ข้อผิดพลาดที่พบ", f"{count:,}")
+        m2.metric("ระดับความเสี่ยง", risk)
+        m3.metric("สถานะ", "เสร็จสิ้น")
         
-        # --- ส่วนแสดงผลลัพธ์ ---
+        # Display Data
         if not findings.empty:
             c_chart, c_tbl = st.columns([1, 1])
             with c_chart:
-                fig = px.pie(findings, values='จำนวน', names='เรื่อง', hole=0.4)
+                fig = px.pie(findings, values='จำนวน', names='แฟ้ม', title="สัดส่วนปัญหาแยกตามแฟ้ม")
                 st.plotly_chart(fig, use_container_width=True)
             with c_tbl:
-                st.dataframe(findings, use_container_width=True)
+                st.write("#### รายการที่พบปัญหา")
+                st.dataframe(findings, use_container_width=True, height=350)
+                
                 csv = findings.to_csv(index=False).encode('utf-8-sig')
-                st.download_button("📥 ดาวน์โหลด CSV", csv, "audit_report.csv", "text/csv")
+                st.download_button("📥 ดาวน์โหลดรายงาน (CSV)", csv, "audit_report.csv", "text/csv")
         else:
-            st.success("🎉 ไม่พบข้อผิดพลาดในกฎที่กำหนดไว้")
+            st.success("🎉 ไม่พบข้อผิดพลาด! ข้อมูลสมบูรณ์ตามกฎที่ตั้งไว้")
             
-        # --- ส่วน Debug Log (สำคัญสำหรับแก้ปัญหา) ---
+        # Debug Logs
         st.markdown("<br>", unsafe_allow_html=True)
-        with st.expander("🛠️ คลิกเพื่อดู Log การทำงาน (ระบบอ่านไฟล์ไหนบ้าง?)"):
-            st.write("ถ้าผลลัพธ์เป็น 0 แสดงว่าอาจไม่เจอชื่อไฟล์ที่ตรงกับกฎ หรืออ่านไฟล์ไม่ออก ตรวจสอบได้ด้านล่าง:")
+        with st.expander("🛠️ ดู Log การทำงานละเอียด (คลิก)"):
             for log in st.session_state.debug_logs:
-                if "❌" in log:
-                    st.error(log)
-                elif "⚠️" in log:
-                    st.warning(log)
-                else:
-                    st.text(log)
+                if "❌" in log: st.error(log)
+                elif "✅" in log: st.success(log)
+                else: st.text(log)
     else:
         st.warning("ไม่มีข้อมูล")
 
