@@ -13,7 +13,16 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- 0. AI CONFIGURATION ---
+# --- 2. User Database (จำลองฐานข้อมูลผู้ใช้) ---
+# ในระบบจริง 150,000 บาท ส่วนนี้จะเชื่อมต่อกับ Database โรงพยาบาล
+USERS_DB = {
+    "hosnarai": "h15000",   # Admin
+    "doctor": "doc123",     # แพทย์
+    "nurse": "nurse123",    # พยาบาล
+    "audit": "audit123"     # กรรมการ
+}
+
+# --- 3. AI CONFIGURATION ---
 HAS_AI_CONNECTION = False
 AI_ERROR_MSG = ""
 
@@ -36,7 +45,7 @@ except ImportError:
 except Exception as e:
     AI_ERROR_MSG = f"Error: {str(e)}"
 
-# --- 2. Resources (Logo) ---
+# --- 4. Resources (Logo) ---
 def get_base64_logo():
     # Logo SVG (Split to avoid truncation)
     p1 = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100" height="100">'
@@ -49,7 +58,7 @@ def get_base64_logo():
 LOGO_HTML = f'<img src="data:image/svg+xml;base64,{get_base64_logo()}" width="100">'
 LOGO_SIDE = f'<img src="data:image/svg+xml;base64,{get_base64_logo()}" width="80" style="display:block;margin:0 auto 20px;">'
 
-# --- 3. CSS Styling (Safe Mode) ---
+# --- 5. CSS Styling (Safe Mode) ---
 def apply_theme():
     # CSS แยกเป็นส่วนๆ เพื่อป้องกัน Error
     css_main = """
@@ -126,7 +135,7 @@ def apply_theme():
     
     st.markdown(css_main + css_btn + css_table + css_others, unsafe_allow_html=True)
 
-# --- 4. Session State ---
+# --- 6. Session State ---
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 if 'username' not in st.session_state: st.session_state.username = ""
 if 'audit_data' not in st.session_state: st.session_state.audit_data = None
@@ -137,7 +146,7 @@ if 'chat_history' not in st.session_state:
         {"role": "assistant", "content": "สวัสดีครับ ผมคือ AI Consultant 🤖 พร้อมให้คำปรึกษาครับ"}
     ]
 
-# --- 5. Logic ---
+# --- 7. Logic ---
 def process_data_mock(uploaded_files):
     # Progress Bar
     bar = st.progress(0, text="Processing...")
@@ -227,7 +236,7 @@ def get_ai_response(user_input):
     except Exception as e:
         return f"Error: {str(e)}"
 
-# --- 6. Components ---
+# --- 8. Components ---
 def render_card(title, value, sub, is_impact=False):
     color = "#1B5E20"
     if is_impact:
@@ -249,7 +258,7 @@ def render_card(title, value, sub, is_impact=False):
     """
     st.markdown(html, unsafe_allow_html=True)
 
-# --- 7. Pages ---
+# --- 9. Pages ---
 def login_page():
     c1, c2, c3 = st.columns([1, 1.5, 1])
     with c2:
@@ -266,9 +275,11 @@ def login_page():
             if st.form_submit_button("LOGIN", use_container_width=True):
                 u = st.session_state.u_input.lower().strip()
                 p = st.session_state.p_input.strip()
-                if u == "hosnarai" and p == "h15000":
+                
+                # Check Login from USERS_DB
+                if u in USERS_DB and USERS_DB[u] == p:
                     st.session_state.logged_in = True
-                    st.session_state.username = "Hosnarai"
+                    st.session_state.username = u # เก็บชื่อ User ที่ล็อกอินจริง
                     st.session_state.current_page = "upload"
                     st.rerun()
                 else:
@@ -278,7 +289,7 @@ def login_page():
 def upload_page():
     c1, c2 = st.columns([4, 1])
     with c1: st.markdown(f"<h2 style='color:#1B5E20;'>Data Import Center</h2>", unsafe_allow_html=True)
-    with c2: st.markdown(f"<div style='text-align:right;padding-top:10px;'><b>{st.session_state.username}</b></div>", unsafe_allow_html=True)
+    with c2: st.markdown(f"<div style='text-align:right;padding-top:10px;'>User: <b>{st.session_state.username}</b></div>", unsafe_allow_html=True)
     
     st.markdown("---")
     st.markdown("""
@@ -360,7 +371,7 @@ def chat_page():
         st.session_state.chat_history.append({"role":"assistant", "content":ans})
         with st.chat_message("assistant"): st.markdown(ans)
 
-# --- 8. Main ---
+# --- 10. Main ---
 def main():
     apply_theme()
     
