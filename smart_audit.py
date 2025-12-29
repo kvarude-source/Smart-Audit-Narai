@@ -7,28 +7,33 @@ import random
 
 # --- 1. Config & Setup ---
 st.set_page_config(
-    page_title="SMART Audit AI - โรงพยาบาลพระนารายณ์มหาราช",
+    page_title="SMART Audit AI",
     page_icon="🏥",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed" # เริ่มต้นพับแถบซ้าย (แก้ปัญหา Login เห็น sidebar)
 )
 
-# --- 0. AI CONFIGURATION (AUTO-DETECT MODEL) ---
+# --- 0. AI CONFIGURATION ---
 try:
     import google.generativeai as genai
-    
-    # 🔑 KEY ของอาจารย์ (ผมใส่ให้แล้ว)
-    YOUR_API_KEY = "AIzaSyCW-ITlPRTPWjEzOieG8KdYU1Gh8Hg-gy0" 
-    
-    genai.configure(api_key=YOUR_API_KEY)
-    HAS_AI_CONNECTION = True
-    AI_ERROR_MSG = ""
+    # ดึง Key จาก Secrets หรือใช้ Hardcode
+    if "GOOGLE_API_KEY" in st.secrets:
+        api_key = st.secrets["GOOGLE_API_KEY"]
+        genai.configure(api_key=api_key)
+        HAS_AI_CONNECTION = True
+        AI_ERROR_MSG = ""
+    else:
+        # ใส่ Key ของอาจารย์ตรงนี้
+        HARDCODED_KEY = "AIzaSyCW-ITlPRTPWjEzOieG8KdYU1Gh8Hg-gy0" 
+        genai.configure(api_key=HARDCODED_KEY)
+        HAS_AI_CONNECTION = True
+        AI_ERROR_MSG = ""
 except ImportError:
     HAS_AI_CONNECTION = False
-    AI_ERROR_MSG = "⚠️ ระบบกำลังอัปเดตเครื่องมือ AI (กรุณารอ Reboot App สักครู่...)"
+    AI_ERROR_MSG = "⚠️ ยังไม่ได้ติดตั้ง google-generativeai"
 except Exception as e:
     HAS_AI_CONNECTION = False
-    AI_ERROR_MSG = f"⚠️ เกิดข้อผิดพลาด: {str(e)}"
+    AI_ERROR_MSG = f"⚠️ Error: {str(e)}"
 
 # --- 2. Resources (Logo) ---
 def get_base64_logo():
@@ -42,80 +47,81 @@ def get_base64_logo():
     return base64.b64encode(svg.encode('utf-8')).decode("utf-8")
 
 LOGO_HTML = f'<img src="data:image/svg+xml;base64,{get_base64_logo()}" width="100">'
-LOGO_SMALL = f'<img src="data:image/svg+xml;base64,{get_base64_logo()}" width="50" style="vertical-align:middle; margin-right:10px;">'
+LOGO_SIDEBAR = f'<img src="data:image/svg+xml;base64,{get_base64_logo()}" width="80" style="display:block; margin: 0 auto 20px auto;">'
 
-# --- 3. CSS Styling (Blue/White Theme - Force Light Mode) ---
+# --- 3. CSS Styling (Green Buttons & Visible Table) ---
 def apply_theme():
     st.markdown("""
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;700&display=swap');
         
-        :root { --primary-color: #1565C0; }
-        
+        /* 1. Global Font */
         html, body, [class*="css"] {
             font-family: 'Prompt', sans-serif;
-            background-color: #F8FAFC !important;
-            color: #334155 !important;
+            color: #333333 !important; /* บังคับตัวหนังสือดำเทา */
         }
         
+        /* 2. Sidebar Styling */
         section[data-testid="stSidebar"] {
             background-color: #FFFFFF !important;
-            border-right: 1px solid #E2E8F0;
-        }
-        section[data-testid="stSidebar"] * { color: #1E3A8A !important; }
-        
-        h1, h2, h3 { color: #1565C0 !important; font-weight: 700 !important; }
-        
-        .stTextInput input, .stPasswordInput input {
-            background-color: #FFFFFF !important;
-            color: #1E3A8A !important;
-            border: 2px solid #BFDBFE !important;
-            border-radius: 8px;
+            border-right: 1px solid #E0E0E0;
         }
         
-        [data-testid="stDataFrame"] {
-            background-color: #FFFFFF !important;
-            border: 1px solid #E2E8F0;
-            border-radius: 10px;
-            padding: 10px;
-        }
-        [data-testid="stDataFrame"] * {
-            background-color: #FFFFFF !important;
-            color: #334155 !important;
-        }
-        
+        /* 3. Green Buttons (Equal Size) */
         div.stButton > button {
-            background-color: #1565C0 !important;
-            color: white !important;
-            border-radius: 8px;
+            background-color: #1B5E20 !important; /* สีเขียวเข้ม */
+            color: #FFFFFF !important; /* ตัวหนังสือขาว */
             border: none;
-            box-shadow: 0 4px 6px rgba(21, 101, 192, 0.2);
+            border-radius: 8px;
+            padding: 12px 20px;
+            font-weight: 600;
+            width: 100%; /* กว้างเต็มช่อง */
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            transition: all 0.3s;
         }
         div.stButton > button:hover {
-            background-color: #0D47A1 !important;
+            background-color: #2E7D32 !important; /* เขียวสว่างขึ้นตอนเอาเมาส์ชี้ */
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            transform: translateY(-2px);
         }
         
-        .login-box {
-            background: white !important;
-            padding: 40px;
-            border-radius: 16px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
-            text-align: center;
-            border-top: 5px solid #1565C0;
-        }
-        
-        .metric-card {
-            background: white !important;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-            border-left: 5px solid #1565C0;
-            text-align: center;
-        }
-        
-        .stChatMessage {
+        /* 4. Table Styling (Fix Invisible Text) */
+        [data-testid="stDataFrame"] {
             background-color: #FFFFFF !important;
-            border: 1px solid #E2E8F0;
+            border: 1px solid #E0E0E0;
+            border-radius: 10px;
+            padding: 5px;
+        }
+        [data-testid="stDataFrame"] div, [data-testid="stDataFrame"] span {
+            color: #000000 !important; /* บังคับตัวหนังสือดำสนิท */
+        }
+        [data-testid="stDataFrame"] th {
+            background-color: #F1F8E9 !important; /* หัวตารางเขียวอ่อน */
+            color: #1B5E20 !important; /* ตัวหนังสือหัวตารางเขียวเข้ม */
+            font-weight: bold !important;
+        }
+        
+        /* 5. Inputs */
+        .stTextInput input, .stPasswordInput input {
+            background-color: #FFFFFF !important;
+            color: #000000 !important;
+            border: 1px solid #CCCCCC !important;
+            border-radius: 6px;
+        }
+        
+        /* 6. Metric Cards */
+        .metric-card {
+            background: white; padding: 20px; border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            border-left: 5px solid #1B5E20; /* ขอบเขียว */
+            text-align: center;
+        }
+        
+        /* Login Box */
+        .login-box {
+            background: white; padding: 40px; border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            text-align: center; border-top: 5px solid #1B5E20;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -128,12 +134,12 @@ if 'summary' not in st.session_state: st.session_state.summary = {}
 if 'current_page' not in st.session_state: st.session_state.current_page = "login"
 if 'chat_history' not in st.session_state: 
     st.session_state.chat_history = [
-        {"role": "assistant", "content": "สวัสดีครับ ผมคือ AI Consultant 🤖 ประจำโรงพยาบาลพระนารายณ์มหาราช \n\nผมพร้อมให้คำปรึกษาแล้วครับ ถามมาได้เลยครับ"}
+        {"role": "assistant", "content": "สวัสดีครับ ผมคือ AI Consultant 🤖 พร้อมให้คำปรึกษาครับ"}
     ]
 
 # --- 5. Mock Logic ---
 def process_data_mock(uploaded_files):
-    progress_text = "กำลังวิเคราะห์ข้อมูล... (AI Processing)"
+    progress_text = "AI กำลังตรวจสอบข้อมูล..."
     my_bar = st.progress(0, text=progress_text)
     for percent_complete in range(100):
         time.sleep(0.01) 
@@ -173,235 +179,22 @@ def process_data_mock(uploaded_files):
     imp = df['IMPACT'].sum()
     return df, {"records": 166196, "pre_audit": pre, "post_audit": pre + imp, "impact": imp}
 
-# --- 6. AI Logic (SMART AUTO-CONNECT) ---
 def get_ai_response(user_input):
     if not HAS_AI_CONNECTION:
-        return f"{AI_ERROR_MSG} (กรุณาอัปเดต requirements.txt เป็น google-generativeai>=0.8.3)"
+        return f"{AI_ERROR_MSG} (กรุณาอัปเดต requirements.txt)"
 
     try:
-        summary_text = "ไม่มีข้อมูล Audit ในขณะนี้"
+        summary_text = "ไม่มีข้อมูล Audit"
         if st.session_state.summary:
             s = st.session_state.summary
-            summary_text = f"ยอด Record={s['records']:,}, ยอด Impact={s['impact']:,.0f} บาท"
+            summary_text = f"ยอด Record={s['records']:,}, Impact={s['impact']:,.0f} บาท"
 
         system_prompt = f"""
-        บทบาท: AI Consultant โรงพยาบาลพระนารายณ์มหาราช
+        คุณคือ AI Consultant โรงพยาบาลพระนารายณ์มหาราช
         ข้อมูล: {summary_text}
-        หน้าที่: ตอบคำถาม Audit/Claim สั้นกระชับ สุภาพ
+        หน้าที่: ตอบคำถาม Audit/Claim สั้นกระชับ สุภาพ ภาษาไทย
         คำถาม: {user_input}
         """
-
-        # --- ส่วนสำคัญ: ระบบค้นหาโมเดลอัตโนมัติ (แก้ปัญหา 404 Model Not Found) ---
-        target_model = 'gemini-1.5-flash' # ตั้งเป็นค่าเริ่มต้น
-        try:
-            # ลองค้นหาโมเดลที่มีในบัญชี
-            available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-            # พยายามหาโมเดล Flash หรือ Pro
-            for m in available_models:
-                if 'flash' in m:
-                    target_model = m
-                    break
-                elif 'pro' in m:
-                    target_model = m
-        except:
-            pass # ถ้าค้นหาไม่ได้ ให้ใช้ค่าเริ่มต้น
-
-        model = genai.GenerativeModel(target_model) 
-        response = model.generate_content(system_prompt)
         
-        return response.text
-
-    except Exception as e:
-        return f"เกิดข้อผิดพลาด ({str(e)}) \n\n⚠️ คำแนะนำ: กรุณาแก้ไฟล์ requirements.txt เป็น google-generativeai>=0.8.3 แล้ว Reboot App ครับ"
-
-# --- 7. Helper UI ---
-def render_card(title, value, sub_text=None, is_impact=False):
-    style_color = "color: #1E3A8A;"
-    if is_impact:
-        val_num = float(str(value).replace(',','').replace(' ฿','').replace('+',''))
-        if val_num < 0:
-            style_color = "color: #EF4444;"
-            sub_text = "▼ Overclaim (เสี่ยงเรียกคืน)"
-        elif val_num > 0:
-            style_color = "color: #10B981;"
-            sub_text = "▲ Underclaim (เบิกเพิ่มได้)"
-    
-    st.markdown(f"""
-    <div class="metric-card">
-        <div style="font-size:14px; color:#64748B;">{title}</div>
-        <div style="font-size:28px; font-weight:800; margin-top:5px; {style_color}">{value}</div>
-        <div style="font-size:13px; margin-top:5px; {style_color}">{sub_text if sub_text else '&nbsp;'}</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-# --- 8. Pages ---
-
-def login_page():
-    c1, c2, c3 = st.columns([1, 1.5, 1])
-    with c2:
-        st.markdown("<br><br><br>", unsafe_allow_html=True)
-        st.markdown('<div class="login-box">', unsafe_allow_html=True)
-        st.markdown(LOGO_HTML, unsafe_allow_html=True)
-        st.markdown('<h2 style="margin-top:20px; color:#1565C0;">โรงพยาบาลพระนารายณ์มหาราช</h2>', unsafe_allow_html=True)
-        st.markdown('<p style="color:#64748B;">SMART Audit AI System</p>', unsafe_allow_html=True)
-        st.markdown("<br>", unsafe_allow_html=True)
-        
-        with st.form("login"):
-            st.text_input("Username", key="u_input")
-            st.text_input("Password", type="password", key="p_input")
-            st.markdown("<br>", unsafe_allow_html=True)
-            if st.form_submit_button("เข้าสู่ระบบ (LOGIN)", use_container_width=True):
-                if st.session_state.u_input.lower().strip() == "hosnarai" and st.session_state.p_input.strip() == "h15000":
-                    st.session_state.logged_in = True
-                    st.session_state.username = "Hosnarai"
-                    st.session_state.current_page = "upload"
-                    st.rerun()
-                else:
-                    st.error("รหัสผ่านไม่ถูกต้อง")
-        st.markdown('</div>', unsafe_allow_html=True)
-
-def upload_page():
-    c1, c2 = st.columns([4, 1])
-    with c1:
-        st.markdown(f"<div style='display:flex;align-items:center;'>{LOGO_SMALL}<h2 style='margin:0; color:#1565C0;'>Data Import Center</h2></div>", unsafe_allow_html=True)
-    with c2:
-        st.markdown(f"<div style='text-align:right;padding-top:10px;color:#1E3A8A;'><b>{st.session_state.username}</b></div>", unsafe_allow_html=True)
-    
-    st.markdown("---")
-    st.markdown("""
-    <div style="background:white; padding:50px; border-radius:16px; border:2px dashed #BFDBFE; text-align:center; margin-bottom:30px;">
-        <h3 style="color:#1565C0;">📂 อัปโหลดไฟล์ 52 แฟ้ม</h3>
-        <p style="color:#64748B;">ลากไฟล์ทั้งหมดมาวางที่นี่เพื่อเริ่มการวิเคราะห์ด้วย AI</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    uploaded = st.file_uploader("", type=["txt"], accept_multiple_files=True, label_visibility="collapsed")
-    
-    if uploaded:
-        st.info(f"📄 พบไฟล์จำนวน {len(uploaded)} ไฟล์ พร้อมวิเคราะห์")
-        c1, c2, c3 = st.columns([1, 1, 1])
-        with c2:
-            if st.button("🚀 เริ่มวิเคราะห์ (Start Audit)", type="primary", use_container_width=True):
-                df, summ = process_data_mock(uploaded)
-                st.session_state.audit_data = df
-                st.session_state.summary = summ
-                st.session_state.current_page = "dashboard"
-                st.rerun()
-
-def dashboard_page():
-    c1, c2 = st.columns([4, 1.2])
-    with c1:
-        st.markdown(f"<div style='display:flex;align-items:center;'>{LOGO_SMALL}<h2 style='margin:0; color:#1565C0;'>Executive Dashboard</h2></div>", unsafe_allow_html=True)
-    with c2:
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("↺ วิเคราะห์ใหม่", use_container_width=True):
-            st.session_state.current_page = "upload"
-            st.rerun()
-
-    st.markdown("---")
-    if st.session_state.audit_data is None:
-        st.warning("กรุณาอัปโหลดข้อมูลก่อน")
-        return
-
-    summ = st.session_state.summary
-    m1, m2, m3, m4 = st.columns(4)
-    with m1: render_card("จำนวน Record", f"{summ['records']:,}", "รายการทั้งหมด")
-    with m2: render_card("ยอดเงินก่อน Audit", f"{summ['pre_audit']:,.0f} ฿", "ยอดส่งเบิกตั้งต้น")
-    with m3: render_card("ยอดเงินหลัง Audit", f"{summ['post_audit']:,.0f} ฿", "ยอดที่คาดว่าจะได้")
-    with m4: render_card("Impact (ผลกระทบ)", f"{summ['impact']:+,.0f} ฿", "", True)
-
-    st.markdown("<br>", unsafe_allow_html=True)
-    
-    t1, t2, t3 = st.tabs(["📋 ALL (ทั้งหมด)", "🩺 OPD (ผู้ป่วยนอก)", "🛏️ IPD (ผู้ป่วยใน)"])
-    df = st.session_state.audit_data
-    df_filtered = df[df['IMPACT'] != 0]
-    df_filtered['HN_AN_SHOW'] = df_filtered.apply(lambda x: x['AN'] if x['TYPE']=='IPD' else x['HN'], axis=1)
-    
-    cfg = {
-        "HN_AN_SHOW": st.column_config.TextColumn("HN / AN", width="medium"),
-        "DATE": st.column_config.TextColumn("วันที่", width="small"),
-        "PTTYPE": st.column_config.TextColumn("สิทธิฯ", width="small"),
-        "FINDING": st.column_config.TextColumn("⚠️ สิ่งที่ตรวจพบ", width="large"),
-        "ACTION": st.column_config.TextColumn("🔧 คำแนะนำ", width="large"),
-        "IMPACT": st.column_config.NumberColumn("💰 Impact", format="%.0f ฿")
-    }
-    cols = ["HN_AN_SHOW", "DATE", "PTTYPE", "FINDING", "ACTION", "IMPACT"]
-    
-    c_space, c_btn = st.columns([5, 1])
-    with c_btn:
-        csv = df_filtered.to_csv(index=False).encode('utf-8-sig')
-        st.download_button("📥 ส่งออก Excel", csv, "smart_audit_report.csv", "text/csv", type="primary", use_container_width=True)
-
-    def show_table(data):
-        if not data.empty:
-            data = data.sort_values(by="IMPACT", ascending=True)
-            st.dataframe(data, column_order=cols, column_config=cfg, use_container_width=True, height=600, hide_index=True)
-        else:
-            st.success("🎉 ไม่พบข้อผิดพลาด (Impact = 0 ถูกซ่อนไว้)")
-
-    with t1: show_table(df_filtered)
-    with t2: show_table(df_filtered[df_filtered['TYPE']=='OPD'])
-    with t3: show_table(df_filtered[df_filtered['TYPE']=='IPD'])
-
-def chat_page():
-    c1, c2 = st.columns([4, 1])
-    with c1:
-        st.markdown(f"<div style='display:flex;align-items:center;'>{LOGO_SMALL}<h2 style='margin:0; color:#1565C0;'>AI Consultant</h2></div>", unsafe_allow_html=True)
-    with c2:
-        if st.button("⬅️ กลับ Dashboard"):
-            st.session_state.current_page = "dashboard"
-            st.rerun()
-            
-    st.markdown("---")
-
-    for msg in st.session_state.chat_history:
-        with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
-
-    if prompt := st.chat_input("พิมพ์คำถามปรึกษา AI..."):
-        st.session_state.chat_history.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
-
-        with st.spinner("AI กำลังคิด..."):
-            response = get_ai_response(prompt)
-            
-        st.session_state.chat_history.append({"role": "assistant", "content": response})
-        with st.chat_message("assistant"):
-            st.markdown(response)
-
-# --- 8. Main Router ---
-def main():
-    apply_theme()
-    
-    with st.sidebar:
-        st.markdown(LOGO_HTML, unsafe_allow_html=True)
-        st.markdown("### SMART Audit AI")
-        if st.session_state.logged_in:
-            st.markdown(f"User: **{st.session_state.username}**")
-            st.markdown("---")
-            if st.button("📊 Dashboard"):
-                st.session_state.current_page = "dashboard"
-                st.rerun()
-            if st.button("💬 AI Consultant"):
-                st.session_state.current_page = "chat"
-                st.rerun()
-            if st.button("📤 Upload Data"):
-                st.session_state.current_page = "upload"
-                st.rerun()
-            st.markdown("<br><br>", unsafe_allow_html=True)
-            if st.button("Log out"):
-                st.session_state.clear()
-                st.rerun()
-
-    if not st.session_state.logged_in:
-        login_page()
-    elif st.session_state.current_page == "chat":
-        chat_page()
-    elif st.session_state.current_page == "dashboard":
-        dashboard_page()
-    else:
-        upload_page()
-
-if __name__ == "__main__":
-    main()
+        # Auto-detect Model Logic
+        model_name = 'gemini-pro
