@@ -13,27 +13,19 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- 0. AI CONFIGURATION (เชื่อมต่อ Secrets) ---
+# --- 0. AI CONFIGURATION (AUTO-DETECT MODEL) ---
 try:
     import google.generativeai as genai
     
-    # พยายามดึง Key จาก Secrets ของ Streamlit Cloud ก่อน
-    if "GOOGLE_API_KEY" in st.secrets:
-        api_key = st.secrets["GOOGLE_API_KEY"]
-        genai.configure(api_key=api_key)
-        HAS_AI_CONNECTION = True
-        AI_ERROR_MSG = ""
-    else:
-        # กรณีรันในเครื่องตัวเอง (Hardcode Key เพื่อทดสอบ)
-        # ใส่ Key ของคุณที่นี่ได้เลยครับ
-        HARDCODED_KEY = "AIzaSyCW-ITlPRTPWjEzOieG8KdYU1Gh8Hg-gy0" 
-        genai.configure(api_key=HARDCODED_KEY)
-        HAS_AI_CONNECTION = True
-        AI_ERROR_MSG = ""
-
+    # 🔑 KEY ของอาจารย์ (ผมใส่ให้แล้ว)
+    YOUR_API_KEY = "AIzaSyCW-ITlPRTPWjEzOieG8KdYU1Gh8Hg-gy0" 
+    
+    genai.configure(api_key=YOUR_API_KEY)
+    HAS_AI_CONNECTION = True
+    AI_ERROR_MSG = ""
 except ImportError:
     HAS_AI_CONNECTION = False
-    AI_ERROR_MSG = "⚠️ ไม่พบ Library 'google-generativeai'"
+    AI_ERROR_MSG = "⚠️ ระบบกำลังอัปเดตเครื่องมือ AI (กรุณารอ Reboot App สักครู่...)"
 except Exception as e:
     HAS_AI_CONNECTION = False
     AI_ERROR_MSG = f"⚠️ เกิดข้อผิดพลาด: {str(e)}"
@@ -181,10 +173,10 @@ def process_data_mock(uploaded_files):
     imp = df['IMPACT'].sum()
     return df, {"records": 166196, "pre_audit": pre, "post_audit": pre + imp, "impact": imp}
 
-# --- 6. AI Logic (Connected to Gemini - FIXED) ---
+# --- 6. AI Logic (SMART AUTO-CONNECT) ---
 def get_ai_response(user_input):
     if not HAS_AI_CONNECTION:
-        return f"{AI_ERROR_MSG}"
+        return f"{AI_ERROR_MSG} (กรุณาอัปเดต requirements.txt เป็น google-generativeai>=0.8.3)"
 
     try:
         summary_text = "ไม่มีข้อมูล Audit ในขณะนี้"
@@ -193,20 +185,34 @@ def get_ai_response(user_input):
             summary_text = f"ยอด Record={s['records']:,}, ยอด Impact={s['impact']:,.0f} บาท"
 
         system_prompt = f"""
-        บทบาท: คุณคือ AI Consultant ผู้เชี่ยวชาญด้านเวชระเบียนและ Audit ของโรงพยาบาลพระนารายณ์มหาราช
-        ข้อมูลปัจจุบัน: {summary_text}
-        หน้าที่: ตอบคำถามเรื่อง Audit และการเบิกจ่าย ตอบสั้นกระชับ สุภาพ ภาษาไทย
+        บทบาท: AI Consultant โรงพยาบาลพระนารายณ์มหาราช
+        ข้อมูล: {summary_text}
+        หน้าที่: ตอบคำถาม Audit/Claim สั้นกระชับ สุภาพ
         คำถาม: {user_input}
         """
 
-        # *** แก้ไขตรงนี้ครับ ใช้ gemini-pro ที่เสถียรกว่า ***
-        model = genai.GenerativeModel('gemini-pro') 
+        # --- ส่วนสำคัญ: ระบบค้นหาโมเดลอัตโนมัติ (แก้ปัญหา 404 Model Not Found) ---
+        target_model = 'gemini-1.5-flash' # ตั้งเป็นค่าเริ่มต้น
+        try:
+            # ลองค้นหาโมเดลที่มีในบัญชี
+            available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+            # พยายามหาโมเดล Flash หรือ Pro
+            for m in available_models:
+                if 'flash' in m:
+                    target_model = m
+                    break
+                elif 'pro' in m:
+                    target_model = m
+        except:
+            pass # ถ้าค้นหาไม่ได้ ให้ใช้ค่าเริ่มต้น
+
+        model = genai.GenerativeModel(target_model) 
         response = model.generate_content(system_prompt)
         
         return response.text
 
     except Exception as e:
-        return f"เกิดข้อผิดพลาด: {str(e)}"
+        return f"เกิดข้อผิดพลาด ({str(e)}) \n\n⚠️ คำแนะนำ: กรุณาแก้ไฟล์ requirements.txt เป็น google-generativeai>=0.8.3 แล้ว Reboot App ครับ"
 
 # --- 7. Helper UI ---
 def render_card(title, value, sub_text=None, is_impact=False):
