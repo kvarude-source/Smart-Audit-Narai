@@ -5,26 +5,6 @@ import time
 import base64
 import random
 
-# --- 0. AI CONFIGURATION ---
-try:
-    import google.generativeai as genai
-    
-    # ดึง Key จาก Secrets แทนการใส่ในโค้ดตรงๆ (ปลอดภัยกว่า)
-    # ถ้าไม่มีใน Secrets ให้ใช้ค่าว่าง (เพื่อกัน Error ตอนรันในเครื่องตัวเองถ้าไม่ได้เซ็ต)
-    if "GOOGLE_API_KEY" in st.secrets:
-        YOUR_API_KEY = st.secrets["GOOGLE_API_KEY"]
-    else:
-        YOUR_API_KEY = "ใส่_KEY_สำรองตรงนี้_กรณีรันในเครื่อง_หรือปล่อยว่างไว้"
-
-    genai.configure(api_key=YOUR_API_KEY)
-    HAS_AI_CONNECTION = True
-
-except ImportError:
-    HAS_AI_CONNECTION = False
-except Exception as e:
-    # กันกรณี Secrets ยังไม่มา
-    HAS_AI_CONNECTION = False
-
 # --- 1. Config & Setup ---
 st.set_page_config(
     page_title="SMART Audit AI - โรงพยาบาลพระนารายณ์มหาราช",
@@ -32,6 +12,28 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# --- 0. AI CONFIGURATION (เชื่อมต่อ Secrets) ---
+try:
+    import google.generativeai as genai
+    
+    # พยายามดึง Key จาก Secrets ของ Streamlit Cloud ก่อน
+    if "GOOGLE_API_KEY" in st.secrets:
+        api_key = st.secrets["GOOGLE_API_KEY"]
+        genai.configure(api_key=api_key)
+        HAS_AI_CONNECTION = True
+        AI_ERROR_MSG = ""
+    else:
+        # กรณีลืมตั้งค่า Secrets
+        HAS_AI_CONNECTION = False
+        AI_ERROR_MSG = "⚠️ ไม่พบ GOOGLE_API_KEY ใน Secrets กรุณาตั้งค่าที่เมนู App Settings"
+
+except ImportError:
+    HAS_AI_CONNECTION = False
+    AI_ERROR_MSG = "⚠️ ไม่พบ Library 'google-generativeai' (กรุณาตรวจสอบ requirements.txt)"
+except Exception as e:
+    HAS_AI_CONNECTION = False
+    AI_ERROR_MSG = f"⚠️ เกิดข้อผิดพลาด: {str(e)}"
 
 # --- 2. Resources (Logo) ---
 def get_base64_logo():
@@ -47,7 +49,7 @@ def get_base64_logo():
 LOGO_HTML = f'<img src="data:image/svg+xml;base64,{get_base64_logo()}" width="100">'
 LOGO_SMALL = f'<img src="data:image/svg+xml;base64,{get_base64_logo()}" width="50" style="vertical-align:middle; margin-right:10px;">'
 
-# --- 3. CSS Styling (Blue/White Theme) ---
+# --- 3. CSS Styling (Blue/White Theme - Force Light Mode) ---
 def apply_theme():
     st.markdown("""
         <style>
@@ -55,7 +57,7 @@ def apply_theme():
         
         :root { --primary-color: #1565C0; }
         
-        /* Global Font & Colors */
+        /* Force Light Mode & Colors */
         html, body, [class*="css"] {
             font-family: 'Prompt', sans-serif;
             background-color: #F8FAFC !important;
@@ -72,7 +74,7 @@ def apply_theme():
         /* Headers */
         h1, h2, h3 { color: #1565C0 !important; font-weight: 700 !important; }
         
-        /* Input Fields */
+        /* Inputs */
         .stTextInput input, .stPasswordInput input {
             background-color: #FFFFFF !important;
             color: #1E3A8A !important;
@@ -185,17 +187,14 @@ def process_data_mock(uploaded_files):
     imp = df['IMPACT'].sum()
     return df, {"records": 166196, "pre_audit": pre, "post_audit": pre + imp, "impact": imp}
 
-# --- 6. AI Logic (REAL CONNECT) ---
+# --- 6. AI Logic (Connected to Gemini) ---
 def get_ai_response(user_input):
     """
     ฟังก์ชันเชื่อมต่อ Gemini Pro เพื่อตอบคำถามจริง
     """
-    # 1. ตรวจสอบว่ามี Library และ Key หรือไม่
+    # 1. เช็คสถานะการเชื่อมต่อ
     if not HAS_AI_CONNECTION:
-        return "⚠️ ขออภัยครับ ระบบยังไม่พบการติดตั้ง 'google-generativeai' กรุณาแจ้ง Admin ให้ติดตั้ง Library ก่อนครับ"
-    
-    if "นำ_API_KEY" in YOUR_API_KEY:
-        return "⚠️ กรุณาใส่ API Key ในโค้ดก่อนครับ (บรรทัดที่ 15)"
+        return f"{AI_ERROR_MSG}"
 
     try:
         # 2. เตรียม Context ข้อมูล
@@ -219,14 +218,14 @@ def get_ai_response(user_input):
         คำถามจากผู้ใช้: {user_input}
         """
 
-        # 4. เรียกใช้งาน Gemini
+        # 4. เรียกใช้งาน Gemini (Google AI)
         model = genai.GenerativeModel('gemini-1.5-flash')
         response = model.generate_content(system_prompt)
         
         return response.text
 
     except Exception as e:
-        return f"เกิดข้อผิดพลาดในการเชื่อมต่อ AI: {str(e)} (กรุณาเช็ค API Key หรืออินเทอร์เน็ต)"
+        return f"เกิดข้อผิดพลาดในการเชื่อมต่อ AI: {str(e)}"
 
 # --- 7. Helper UI ---
 def render_card(title, value, sub_text=None, is_impact=False):
@@ -378,7 +377,7 @@ def chat_page():
             st.markdown(prompt)
 
         with st.spinner("AI กำลังคิด..."):
-            # เรียกใช้ฟังก์ชัน AI ของจริง
+            # เรียกใช้ฟังก์ชัน AI ของจริง (Gemini)
             response = get_ai_response(prompt)
             
         st.session_state.chat_history.append({"role": "assistant", "content": response})
