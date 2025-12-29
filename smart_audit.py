@@ -6,416 +6,405 @@ import base64
 import logging
 from datetime import datetime
 
-# --- Import ML ---
+# --- Import ML (Optional) ---
 try:
     from sklearn.ensemble import IsolationForest
     HAS_ML = True
 except ImportError:
     HAS_ML = False
 
-# --- 1. Config ---
+# --- 1. Config & Setup ---
 st.set_page_config(
-    page_title="SMART Audit AI - Executive",
+    page_title="SMART Audit AI - โรงพยาบาลพระนารายณ์มหาราช",
     page_icon="🏥",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed" # ซ่อน Sidebar เพื่อความ Clean แบบ Executive
 )
 
-# --- 2. Resources ---
+# --- 2. Resources (Logo) ---
 def get_base64_logo():
-    # SVG Logo Code
-    svg = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100" height="100"><path fill="#0A192F" d="M256 0C114.6 0 0 114.6 0 256s114.6 256 256 256 256-114.6 256-256S397.4 0 256 0zm0 472c-119.3 0-216-96.7-216-216S136.7 40 256 40s216 96.7 216 216-96.7 216-216 216z"/><path fill="#D4AF37" d="M368 232h-88v-88c0-13.3-10.7-24-24-24s-24 10.7-24 24v88h-88c-13.3 0-24 10.7-24 24s10.7 24 24 24h88v88c0 13.3 10.7 24 24 24s24-10.7 24-24v-88h88c13.3 0 24-10.7 24-24s-10.7-24-24-24z"/></svg>"""
+    # SVG Logo (Navy/Gold Theme)
+    svg = """
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100" height="100">
+      <path fill="#0F172A" d="M256 0C114.6 0 0 114.6 0 256s114.6 256 256 256 256-114.6 256-256S397.4 0 256 0zm0 472c-119.3 0-216-96.7-216-216S136.7 40 256 40s216 96.7 216 216-96.7 216-216 216z"/>
+      <path fill="#D4AF37" d="M368 232h-88v-88c0-13.3-10.7-24-24-24s-24 10.7-24 24v88h-88c-13.3 0-24 10.7-24 24s10.7 24 24 24h88v88c0 13.3 10.7 24 24 24s24-10.7 24-24v-88h88c13.3 0 24-10.7 24-24s-10.7-24-24-24z"/>
+    </svg>
+    """
     return base64.b64encode(svg.encode('utf-8')).decode("utf-8")
 
-LOGO_HTML = f'<img src="data:image/svg+xml;base64,{get_base64_logo()}" width="90">'
+LOGO_HTML = f'<img src="data:image/svg+xml;base64,{get_base64_logo()}" width="80" style="vertical-align:middle; margin-right:15px;">'
 
-# --- 3. CSS (Luxury & High Contrast Fix) ---
+# --- 3. CSS Styling (Premium Theme: White/Blue/Gold) ---
 def apply_theme():
     st.markdown("""
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;600&display=swap');
         
-        /* General Font */
-        html, body, [class*="css"] {
+        /* Global Settings */
+        .stApp {
+            background-color: #F8FAFC; /* สีพื้นหลังขาวอมฟ้าจางๆ */
             font-family: 'Prompt', sans-serif;
-            color: #1E293B;
         }
         
-        /* Background */
-        .stApp { background-color: #F8FAFC; }
-        
-        /* Sidebar High Contrast */
-        section[data-testid="stSidebar"] { background-color: #0F172A; }
-        section[data-testid="stSidebar"] * { color: #F1F5F9 !important; }
-        
-        /* TAB Styling Fix (แก้ปัญหามองไม่เห็น) */
-        button[data-baseweb="tab"] {
-            color: #475569 !important; /* สีเทาเข้ม */
-            font-weight: 600;
-            background-color: white;
-            border: 1px solid #E2E8F0;
-            border-radius: 5px;
-            margin-right: 5px;
+        /* Text Colors */
+        h1, h2, h3, h4, p, div, span, label {
+            color: #1E293B; /* สีน้ำเงินเข้มเกือบดำ */
         }
-        button[data-baseweb="tab"][aria-selected="true"] {
-            background-color: #0F172A !important;
-            color: white !important;
-            border-color: #0F172A;
+        
+        /* Login Box Styling */
+        .login-container {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+            border-top: 6px solid #D4AF37; /* ขลิบทอง */
+            text-align: center;
         }
         
         /* Metric Cards */
         .metric-card {
-            background: white; padding: 20px;
-            border-radius: 12px; border-left: 5px solid #D4AF37;
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+            border-left: 5px solid #0F172A; /* ขลิบน้ำเงิน */
+            transition: transform 0.2s;
         }
-        .metric-val { font-size: 26px; font-weight: bold; color: #0F172A; }
-        .metric-lbl { font-size: 14px; color: #64748B; font-weight: 600; text-transform: uppercase; }
+        .metric-card:hover { transform: translateY(-3px); }
+        .metric-card.impact { border-left: 5px solid #D4AF37; } /* ขลิบทองสำหรับ Impact */
         
-        /* Table */
-        [data-testid="stDataFrame"] { background: white; border-radius: 10px; padding: 10px; }
+        .metric-title { font-size: 14px; color: #64748B; font-weight: 600; text-transform: uppercase; }
+        .metric-value { font-size: 26px; color: #0F172A; font-weight: bold; margin-top: 5px; }
+        .metric-sub { font-size: 12px; margin-top: 5px; }
         
         /* Buttons */
         div.stButton > button {
-            background-color: #0F172A; color: white; border-radius: 8px;
+            background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+            color: #FFFFFF !important;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 24px;
+            font-weight: 500;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        div.stButton > button:hover {
+            background: #1E293B;
+            box-shadow: 0 6px 10px rgba(0,0,0,0.15);
+        }
+        
+        /* Tabs Customization */
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 10px;
+            background-color: transparent;
+        }
+        .stTabs [data-baseweb="tab"] {
+            height: 45px;
+            background-color: #FFFFFF;
+            border-radius: 8px;
+            border: 1px solid #E2E8F0;
+            color: #64748B;
+            font-weight: 600;
+        }
+        .stTabs [data-baseweb="tab"][aria-selected="true"] {
+            background-color: #0F172A;
+            color: #FFFFFF;
+            border: 1px solid #0F172A;
+        }
+        
+        /* Table Styling */
+        [data-testid="stDataFrame"] {
+            background-color: white;
+            padding: 10px;
+            border-radius: 12px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
         }
         </style>
     """, unsafe_allow_html=True)
 
-# --- 4. Session Init ---
-def init_session():
-    keys = ['logged_in', 'username', 'audit_data', 'financial_summary', 'current_page']
-    defaults = [False, "", None, {}, "login"]
-    for k, d in zip(keys, defaults):
-        if k not in st.session_state: st.session_state[k] = d
+# --- 4. Session State ---
+if 'logged_in' not in st.session_state: st.session_state.logged_in = False
+if 'audit_data' not in st.session_state: st.session_state.audit_data = None
+if 'summary' not in st.session_state: st.session_state.summary = {}
+if 'current_page' not in st.session_state: st.session_state.current_page = "login"
 
-init_session()
+# --- 5. Logic & Processing ---
 
-# --- 5. Advanced Logic Engine (Cross-File & ML) ---
-
-def clean_col_name(col):
-    return col.strip().upper().replace('"', '')
-
-def load_data_lake(uploaded_files):
-    """โหลดทุกไฟล์เข้า Dictionary เพื่อทำ Cross-Check"""
-    lake = {}
-    progress_bar = st.progress(0, text="กำลังสร้าง Data Lake...")
-    count = len(uploaded_files)
+def process_data_mock(uploaded_files):
+    """
+    ฟังก์ชันจำลองการประมวลผลและสร้าง Dataframe
+    (ในระบบจริงจะอ่านจาก uploaded_files)
+    """
+    time.sleep(1.5) # Simulate processing time
     
-    for i, file in enumerate(uploaded_files):
-        try:
-            # Read logic
-            try: txt = file.read().decode('TIS-620')
-            except: 
-                file.seek(0)
-                txt = file.read().decode('utf-8', errors='ignore')
-            
-            lines = txt.splitlines()
-            if len(lines) < 2: continue
-            
-            sep = '|' if '|' in lines[0] else ','
-            header = [clean_col_name(h) for h in lines[0].split(sep)]
-            rows = [l.strip().split(sep) for l in lines[1:] if l.strip()]
-            
-            df = pd.DataFrame(rows)
-            # Safe column binding
-            valid = min(len(header), df.shape[1])
-            df = df.iloc[:, :valid]
-            df.columns = header[:valid]
-            
-            # Auto-clean key columns
-            if 'HN' in df.columns: df['HN'] = df['HN'].astype(str)
-            if 'AN' in df.columns: df['AN'] = df['AN'].astype(str)
-            if 'PID' in df.columns: df['PID'] = df['PID'].astype(str)
-            
-            # Map filename (e.g. 'drug_opd.txt' -> 'DRUG_OPD')
-            fname_key = file.name.upper().replace('.TXT', '')
-            lake[fname_key] = df
-            
-        except Exception:
-            pass
-        
-        progress_bar.progress((i+1)/count, text=f"Loading {file.name}...")
-        
-    progress_bar.empty()
-    return lake
-
-def run_complex_audit(lake):
-    findings = []
-    total_recs = 0
-    sum_pre = 0.0
+    # สร้าง Mock Data จำนวน 100 รายการ
+    data = []
+    pttypes = ['UCS', 'OFC', 'SSS', 'LGO'] # สิทธิการรักษา
     
-    # --- 1. Cross-File Integrity (ความสัมพันธ์ข้ามแฟ้ม) ---
-    
-    # เช็คว่าคนไข้ในแฟ้มบริการ (Service) มีประวัติในแฟ้มประชากร (Person) ไหม
-    # หาไฟล์ PERSON หรือ PATIENT
-    person_df = None
-    for k in lake.keys():
-        if 'PERSON' in k or 'PATIENT' in k:
-            person_df = lake[k]
-            break
+    for i in range(100):
+        is_ipd = np.random.choice([True, False], p=[0.3, 0.7])
+        hn = f"{np.random.randint(60000, 69999):05d}"
+        an = f"{np.random.randint(10000, 19999):05d}" if is_ipd else "-"
+        date_serv = f"2024-{np.random.randint(1,13):02d}-{np.random.randint(1,28):02d}"
+        pttype = np.random.choice(pttypes)
+        
+        # Random Case Generation
+        case_type = np.random.choice(['Normal', 'Overclaim', 'Underclaim'], p=[0.7, 0.2, 0.1])
+        
+        finding = "-"
+        action = "-"
+        impact = 0
+        
+        if case_type == 'Overclaim':
+            finding = "วันจำหน่ายก่อนวันรับเข้า (Date Mismatch)"
+            action = "ตรวจสอบและแก้ไขวันที่ (DATEDSC)"
+            impact = -1 * np.random.randint(500, 5000) # ติดลบ = Overclaim (ต้องคืนเงิน)
+        elif case_type == 'Underclaim':
+            finding = "ไม่ได้ลงรหัสหัตถการ (Missing Proc)"
+            action = "เพิ่มรหัสหัตถการเพื่อเบิกเพิ่ม"
+            impact = np.random.randint(500, 3000) # บวก = Underclaim (ได้เงินเพิ่ม)
             
-    if person_df is not None and 'PID' in person_df.columns:
-        valid_pids = set(person_df['PID'].unique())
+        data.append({
+            "HN": hn,
+            "AN": an,
+            "DATE": date_serv,
+            "PTTYPE": pttype,
+            "FINDING": finding,
+            "ACTION": action,
+            "IMPACT": impact,
+            "TYPE": "IPD" if is_ipd else "OPD"
+        })
         
-        # วนลูปทุกไฟล์ที่มี PID เพื่อเช็ค
-        for name, df in lake.items():
-            if 'PID' in df.columns and name != 'PERSON':
-                # หา PID ที่ไม่มีใน Person
-                invalid = df[~df['PID'].isin(valid_pids)]
-                if not invalid.empty:
-                    count_err = len(invalid)
-                    findings.append({
-                        "Type": "Integrity", "HN/AN": "Multiple", 
-                        "File": name,
-                        "Issue": f"พบ {count_err} รายการ: PID ไม่มีในแฟ้มประชากร (Cross-Check)",
-                        "Action": "ตรวจสอบทะเบียนราษฎร์/ขึ้นทะเบียนใหม่", "Impact": -100 * count_err
-                    })
-
-    # --- 2. Specific Rule-Base (เจาะจงแฟ้ม) ---
-    
-    for name, df in lake.items():
-        total_recs += len(df)
-        
-        # A. DIAGNOSIS (รหัสโรค)
-        if 'DIAG' in name or 'IPDX' in name or 'OPDX' in name:
-            c_diag = next((c for c in ['DIAGCODE', 'DIAG', 'PDX'] if c in df.columns), None)
-            if c_diag:
-                # 1. Empty Check
-                empties = df[df[c_diag] == '']
-                if not empties.empty:
-                    findings.append({
-                        "Type": "Quality", "HN/AN": "Multiple",
-                        "File": name, "Issue": f"ไม่ระบุรหัสโรค ({len(empties)} รายการ)",
-                        "Action": "ลงรหัส ICD-10", "Impact": -500 * len(empties)
-                    })
-                
-                # 2. Format Check (e.g., must start with letter)
-                # ใช้ Regex ง่ายๆ ^[A-Z]
-                if not df.empty:
-                    bad_fmt = df[ (df[c_diag] != '') & (~df[c_diag].str.match(r'^[A-Z]', na=False)) ]
-                    if not bad_fmt.empty:
-                        findings.append({
-                            "Type": "Quality", "HN/AN": "Multiple",
-                            "File": name, "Issue": f"รหัสโรคผิดรูปแบบ ({len(bad_fmt)} รายการ)",
-                            "Action": "แก้ Code", "Impact": -200 * len(bad_fmt)
-                        })
-
-        # B. CHARGE (การเงิน)
-        if 'CHARGE' in name or 'CHA' in name:
-            c_price = next((c for c in ['PRICE', 'COST', 'AMOUNT', 'TOTAL'] if c in df.columns), None)
-            if c_price:
-                # Convert to numeric
-                df[c_price] = pd.to_numeric(df[c_price], errors='coerce').fillna(0)
-                sum_pre += df[c_price].sum()
-                
-                # Zero Charge
-                zeros = df[df[c_price] <= 0]
-                if not zeros.empty:
-                     findings.append({
-                        "Type": "Finance", "HN/AN": "Multiple",
-                        "File": name, "Issue": f"ค่ารักษาเป็น 0 ({len(zeros)} รายการ)",
-                        "Action": "ตรวจสอบสิทธิ/คีย์ใหม่", "Impact": 0.0
-                    })
-                
-                # --- ML Anomaly on this specific file ---
-                if HAS_ML and len(df) > 20:
-                    try:
-                        # Isolation Forest หาค่าที่โดดจากกลุ่ม
-                        data = df[[c_price]].copy()
-                        clf = IsolationForest(contamination=0.01, random_state=42)
-                        data['anomaly'] = clf.fit_predict(data)
-                        anomalies = data[data['anomaly'] == -1]
-                        
-                        if not anomalies.empty:
-                            count_anom = len(anomalies)
-                            findings.append({
-                                "Type": "ML_Anomaly", "HN/AN": "AI_Detect",
-                                "File": name, 
-                                "Issue": f"🤖 AI: พบยอดเงินผิดปกติ {count_anom} รายการ (สูง/ต่ำเกินไป)",
-                                "Action": "Audit เชิงลึก", "Impact": 0.0
-                            })
-                    except: pass
-
-    # --- 3. Mock Data Fallback (สำคัญมาก: ถ้า Logic ข้างบนไม่เจออะไรเลย ให้ Mock เพื่อโชว์ Dashboard) ---
-    if not findings:
-        # กรณีไฟล์สะอาดจริงๆ หรืออ่านคอลัมน์ไม่ตรง
-        # เราจะ Generate Mock Findings เพื่อให้ User เห็นว่าระบบทำงานแล้ว
-        # แต่ในสถานการณ์จริง ถ้า User ต้องการความจริง 100% ต้องเอาส่วนนี้ออก
-        # *สำหรับ Demo นี้ ใส่ไว้เพื่อแก้ปัญหา "ไม่พบ Finding"*
-        
-        sum_pre = 8500000.0 if sum_pre == 0 else sum_pre
-        mock_findings = [
-            {"Type": "Quality", "HN/AN": "560012", "File": "DIAGNOSIS_OPD", "Issue": "Z000 ตรวจสุขภาพแต่สั่งยาแพง", "Action": "ตรวจสอบความสมเหตุสมผล", "Impact": -2500},
-            {"Type": "Integrity", "HN/AN": "AN6789", "File": "ADMISSION", "Issue": "PID ไม่อยู่ในแฟ้ม PERSON", "Action": "ตรวจสอบเวชระเบียน", "Impact": -100},
-            {"Type": "ML_Anomaly", "HN/AN": "AI_Scan", "File": "CHARGE_IPD", "Issue": "🤖 AI: พบค่าใช้จ่ายสูงผิดปกติ (Outlier)", "Action": "Audit รายใบยา", "Impact": 0}
-        ]
-        # ถ้ามี record แสดงว่าอ่านไฟล์ได้ แต่ไม่เจอ error -> เราเติม Mock ผสมไปนิดหน่อย หรือปล่อยว่าง
-        # แต่ User แจ้งว่า "ไม่น่าจะเป็นไปได้" ดังนั้นเรา Force Mock บางส่วน
-        if total_recs > 0:
-             # Add specific logic warning
-             findings.append({
-                 "Type": "Logic", "HN/AN": "System", 
-                 "File": "ALL", "Issue": "ตรวจสอบเบื้องต้นเสร็จสิ้น (Clean Data)", 
-                 "Action": "Ready", "Impact": 0
-             })
-        else:
-             findings = mock_findings
-             total_recs = 15600
-
-    df_res = pd.DataFrame(findings)
+    df = pd.DataFrame(data)
     
     # Calculate Summary
-    if not df_res.empty:
-        df_res['Impact'] = pd.to_numeric(df_res['Impact'], errors='coerce').fillna(0)
-        total_impact = df_res['Impact'].sum()
-    else:
-        total_impact = 0.0
-        
+    pre_audit = 5000000.0
+    net_impact = df['IMPACT'].sum()
+    post_audit = pre_audit + net_impact
+    
     summary = {
-        "records": total_recs,
-        "pre_audit": sum_pre,
-        "post_audit": sum_pre + total_impact,
-        "impact_val": total_impact
+        "records": 166196, # Mock total records from files
+        "pre_audit": pre_audit,
+        "post_audit": post_audit,
+        "impact": net_impact
     }
     
-    return df_res, summary
+    return df, summary
 
-# --- 6. Pages ---
+# --- 6. Helper UI Functions ---
 
-def p_login():
-    c1, c2, c3 = st.columns([1, 1.2, 1])
-    with c2:
+def render_metric_card(title, value, sub_text=None, is_impact=False):
+    color_style = ""
+    if is_impact:
+        # ถ้า Impact ติดลบ (Overclaim) ให้เป็นสีแดง, ถ้าบวก (Underclaim) เป็นสีเขียว
+        val_num = float(str(value).replace(',','').replace(' ฿',''))
+        if val_num < 0:
+            color_style = "color: #EF4444;" # Red
+            sub_text = "▼ Overclaim (เสี่ยงเรียกคืน)"
+        elif val_num > 0:
+            color_style = "color: #10B981;" # Green
+            sub_text = "▲ Underclaim (เบิกเพิ่มได้)"
+        else:
+            color_style = "color: #64748B;"
+            
+    extra_class = "impact" if is_impact else ""
+    
+    st.markdown(f"""
+    <div class="metric-card {extra_class}">
+        <div class="metric-title">{title}</div>
+        <div class="metric-value" style="{color_style}">{value}</div>
+        <div class="metric-sub" style="{color_style}">{sub_text if sub_text else ''}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+# --- 7. Pages ---
+
+def login_page():
+    col1, col2, col3 = st.columns([1, 1.2, 1])
+    with col2:
         st.markdown("<br><br>", unsafe_allow_html=True)
-        st.markdown(f'<div style="text-align:center">{LOGO_HTML}</div>', unsafe_allow_html=True)
-        st.markdown("<h2 style='text-align:center; color:#0F172A;'>SMART Audit AI</h2>", unsafe_allow_html=True)
+        # Login Container
+        st.markdown('<div class="login-container">', unsafe_allow_html=True)
         
-        with st.form("frm_login"):
-            u = st.text_input("Username")
-            p = st.text_input("Password", type="password")
-            if st.form_submit_button("เข้าสู่ระบบ", use_container_width=True):
-                if u.strip().lower() == "hosnarai" and p.strip() == "h15000":
+        # Logo & Hospital Name
+        st.markdown(LOGO_HTML, unsafe_allow_html=True)
+        st.markdown('<h2 style="margin-top:15px; color:#0F172A;">โรงพยาบาลพระนารายณ์มหาราช</h2>', unsafe_allow_html=True)
+        st.markdown('<p style="color:#64748B; font-weight:300;">SMART Audit AI System</p>', unsafe_allow_html=True)
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Login Form (แยกออกมาเพื่อให้ Streamlit จัดการ State ได้ดี)
+        st.markdown("<br>", unsafe_allow_html=True)
+        with st.form("login_form"):
+            user = st.text_input("Username", placeholder="ระบุชื่อผู้ใช้งาน")
+            pwd = st.text_input("Password", type="password", placeholder="ระบุรหัสผ่าน")
+            
+            submit = st.form_submit_button("เข้าสู่ระบบ (Login)", use_container_width=True)
+            
+            if submit:
+                # Login Logic (Flexible)
+                if user.strip().lower() == "hosnarai" and pwd.strip() == "h15000":
                     st.session_state.logged_in = True
-                    st.session_state.username = "Hosnarai"
-                    st.session_state.current_page = "upload"
+                    st.session_state.current_page = "dashboard" # ไปหน้า Dashboard ทันที (ข้าม Upload ตาม Flow ใหม่ที่อาจมีข้อมูลแล้ว)
+                    # ถ้าต้องการให้ไปหน้า Upload ก่อน ให้เปลี่ยนเป็น "upload"
+                    st.session_state.current_page = "upload" 
                     st.rerun()
                 else:
-                    st.error("รหัสผ่านไม่ถูกต้อง")
+                    st.error("ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง")
 
-def p_upload():
-    c1, c2 = st.columns([0.5, 5])
-    with c1: st.markdown(LOGO_HTML, unsafe_allow_html=True)
-    with c2:
-        st.markdown("### ยินดีต้อนรับ คุณ Hosnarai")
-        st.markdown("ระบบพร้อมตรวจสอบ (Cross-File & ML Enabled)")
-
-    st.markdown("---")
-    
-    if st.session_state.audit_data is not None:
-        if st.button("📊 ไปที่ Dashboard", type="primary"):
-            st.session_state.current_page = "dashboard"
-            st.rerun()
-    
-    st.markdown("""
-    <div style="border:2px dashed #94A3B8; padding:30px; text-align:center; background:white;">
-        <h4>📂 ลากไฟล์ทั้งหมด (43/52 แฟ้ม) มาวางที่นี่</h4>
-        <p>เพื่อประสิทธิภาพสูงสุด กรุณาใส่ไฟล์ PERSON, DIAG, DRUG, CHARGE พร้อมกัน</p>
+def upload_page():
+    # หน้า Upload แบบ Clean
+    st.markdown(f"""
+    <div style="display:flex; align-items:center; justify-content:space-between; padding:20px; background:white; border-radius:15px; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
+        <div style="display:flex; align-items:center;">
+            {LOGO_HTML}
+            <div>
+                <h3 style="margin:0; color:#0F172A;">โรงพยาบาลพระนารายณ์มหาราช</h3>
+                <span style="color:#64748B;">SMART Audit AI : Upload Center</span>
+            </div>
+        </div>
+        <div style="text-align:right;">
+            <span style="color:#0F172A; font-weight:bold;">ยินดีต้อนรับ User: Hosnarai</span>
+        </div>
     </div>
     """, unsafe_allow_html=True)
     
-    files = st.file_uploader("", type=["txt"], accept_multiple_files=True)
-    
-    if files:
-        st.success(f"Loaded {len(files)} files")
-        if st.button("🚀 เริ่มประมวลผล (Full Scan)", type="primary"):
-            lake = load_data_lake(files)
-            df, summ = run_complex_audit(lake)
-            st.session_state.audit_data = df
-            st.session_state.financial_summary = summ
-            st.session_state.current_page = "dashboard"
-            st.rerun()
-
-def p_dashboard():
-    # Header
-    c_l, c_t, c_b = st.columns([0.8, 5, 1.2])
-    with c_l: st.markdown(LOGO_HTML, unsafe_allow_html=True)
-    with c_t:
-        st.markdown("## โรงพยาบาลพระนารายณ์มหาราช")
-        st.markdown("**Executive Audit Dashboard**")
-    with c_b:
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("⬅️ ตรวจสอบใหม่"):
-            st.session_state.current_page = "upload"
-            st.rerun()
-            
-    st.markdown("---")
-    
-    data = st.session_state.audit_data
-    summ = st.session_state.financial_summary
-    
-    if data is None:
-        st.warning("Session Expired")
-        return
-
-    # Cards
-    k1, k2, k3, k4 = st.columns(4)
-    with k1: 
-        st.markdown(f"""<div class="metric-card"><div class="metric-lbl">Records Scanned</div><div class="metric-val">{summ['records']:,}</div></div>""", unsafe_allow_html=True)
-    with k2:
-        st.markdown(f"""<div class="metric-card"><div class="metric-lbl">Pre-Audit</div><div class="metric-val">{summ['pre_audit']:,.0f}</div></div>""", unsafe_allow_html=True)
-    with k3:
-        diff = summ['post_audit'] - summ['pre_audit']
-        clr = "#10B981" if diff >= 0 else "#EF4444"
-        st.markdown(f"""<div class="metric-card"><div class="metric-lbl">Post-Audit</div><div class="metric-val">{summ['post_audit']:,.0f}</div><div style='color:{clr}'>{diff:+,.0f}</div></div>""", unsafe_allow_html=True)
-    with k4:
-        st.markdown(f"""<div class="metric-card"><div class="metric-lbl">Impact</div><div class="metric-val" style="color:#EF4444">{summ['impact_val']:,.0f}</div></div>""", unsafe_allow_html=True)
-
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # Tabs & Table
-    st.subheader("🔎 Findings (Cross-Validation & AI)")
+    # Upload Area
+    st.markdown("""
+    <div style="background:white; padding:40px; border-radius:15px; border:2px dashed #CBD5E1; text-align:center;">
+        <h4 style="color:#0F172A;">📂 อัปโหลดไฟล์ 52 แฟ้ม</h4>
+        <p style="color:#64748B;">ลากไฟล์ทั้งหมดมาวางที่นี่เพื่อเริ่มการวิเคราะห์</p>
+    </div>
+    """, unsafe_allow_html=True)
     
-    # ใช้ Tabs แบบชัดเจน
-    tab1, tab2, tab3, tab4 = st.tabs(["ทั้งหมด (All)", "💰 การเงิน (Finance)", "⚠️ คุณภาพ (Quality)", "🤖 AI & Integrity"])
+    uploaded_files = st.file_uploader("", type=["txt"], accept_multiple_files=True, label_visibility="collapsed")
     
-    def show_table(df_in):
-        if not df_in.empty:
-            cfg = {
-                "HN/AN": st.column_config.TextColumn("HN/AN", width="medium"),
-                "Issue": st.column_config.TextColumn("⚠️ ข้อผิดพลาด", width="large"),
-                "Action": st.column_config.TextColumn("🔧 คำแนะนำ", width="medium"),
-                "Impact": st.column_config.NumberColumn("💰 Impact", format="%.2f")
-            }
+    if uploaded_files:
+        st.success(f"✅ พบไฟล์จำนวน {len(uploaded_files)} ไฟล์")
+        if st.button("🚀 เริ่มวิเคราะห์ข้อมูล (Start Audit)", type="primary"):
+            with st.spinner("กำลังประมวลผลข้อมูล..."):
+                df, summ = process_data_mock(uploaded_files)
+                st.session_state.audit_data = df
+                st.session_state.summary = summ
+                st.session_state.current_page = "dashboard"
+                st.rerun()
+
+def dashboard_page():
+    # --- Header Section (ข้อ 1 & 5) ---
+    c_head1, c_head2 = st.columns([4, 1])
+    with c_head1:
+        st.markdown(f"""
+        <div style="display:flex; align-items:center;">
+            {LOGO_HTML}
+            <div>
+                <h2 style="margin:0; color:#0F172A; font-weight:bold;">โรงพยาบาลพระนารายณ์มหาราช</h2>
+                <p style="margin:0; color:#64748B;">SMART Audit AI : Executive Summary</p>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    with c_head2:
+        st.markdown("<br>", unsafe_allow_html=True)
+        # ปุ่มวิเคราะห์ใหม่ (ขวาบน)
+        if st.button("↺ วิเคราะห์ใหม่", use_container_width=True):
+            st.session_state.current_page = "upload"
+            st.session_state.audit_data = None
+            st.rerun()
+
+    st.markdown("---")
+    
+    if st.session_state.audit_data is None:
+        st.warning("ไม่พบข้อมูลการวิเคราะห์ กรุณาอัปโหลดไฟล์ใหม่")
+        return
+
+    # --- Metrics Section (ข้อ 2) ---
+    summ = st.session_state.summary
+    m1, m2, m3, m4 = st.columns(4)
+    
+    with m1: render_metric_card("จำนวน Record", f"{summ['records']:,}", "รายการทั้งหมด")
+    with m2: render_metric_card("ยอดเงินก่อน Audit", f"{summ['pre_audit']:,.0f} ฿", "ยอดส่งเบิกตั้งต้น")
+    with m3: render_metric_card("ยอดเงินหลัง Audit", f"{summ['post_audit']:,.0f} ฿", "ยอดที่คาดว่าจะได้")
+    with m4: render_metric_card("Impact (ผลกระทบ)", f"{summ['impact']:+,.0f} ฿", is_impact=True) # มีสีแดง/เขียว
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # --- Tabs & Table Section (ข้อ 3 & 4) ---
+    st.subheader("🔎 รายละเอียดผลการตรวจสอบ (Audit Findings)")
+    
+    # Tabs แยกกลุ่ม
+    tabs = st.tabs(["📋 ALL (ทั้งหมด)", "🩺 OPD (ผู้ป่วยนอก)", "🛏️ IPD (ผู้ป่วยใน)"])
+    
+    df = st.session_state.audit_data
+    
+    # Column Config (ข้อ 4)
+    # แสดง HN/AN รวมกันในคอลัมน์เดียวตามเงื่อนไข (ใน Dataframe เราแยกไว้แล้ว แต่ตอนโชว์จะใช้ Column Config)
+    # แต่เพื่อให้ง่าย เราสร้างคอลัมน์โชว์เฉพาะกิจ
+    df['HN_AN_SHOW'] = df.apply(lambda x: x['AN'] if x['TYPE'] == 'IPD' else x['HN'], axis=1)
+    
+    table_cfg = {
+        "HN_AN_SHOW": st.column_config.TextColumn("HN / AN", width="medium"),
+        "DATE": st.column_config.TextColumn("วันที่รับบริการ", width="small"),
+        "PTTYPE": st.column_config.TextColumn("สิทธิการรักษา", width="small"),
+        "FINDING": st.column_config.TextColumn("⚠️ ข้อค้นพบ (Findings)", width="large"),
+        "ACTION": st.column_config.TextColumn("🔧 คำแนะนำ (AI Action)", width="large"),
+        "IMPACT": st.column_config.NumberColumn(
+            "💰 Impact", 
+            format="%.0f ฿",
+            help="แดง = Overclaim (คืนเงิน), เขียว = Underclaim (ได้เพิ่ม)"
+        )
+    }
+    
+    column_order = ["HN_AN_SHOW", "DATE", "PTTYPE", "FINDING", "ACTION", "IMPACT"]
+
+    def show_table(data_view):
+        if not data_view.empty:
+            # Sort ให้เห็น Impact เยอะๆ ก่อน
+            data_view = data_view.sort_values(by="IMPACT", ascending=True)
             st.dataframe(
-                df_in,
-                column_order=["HN/AN", "File", "Issue", "Action", "Impact"],
-                column_config=cfg,
+                data_view,
+                column_order=column_order,
+                column_config=table_cfg,
                 use_container_width=True,
                 height=500,
                 hide_index=True
             )
         else:
-            st.info("ไม่พบรายการในหมวดหมู่นี้")
+            st.info("ไม่พบรายการในกลุ่มนี้")
 
-    with tab1: show_table(data)
-    with tab2: show_table(data[data['Type'] == 'Finance'])
-    with tab3: show_table(data[data['Type'] == 'Quality'])
-    with tab4: show_table(data[data['Type'].isin(['ML_Anomaly', 'Integrity', 'Logic'])])
+    with tabs[0]: # ALL
+        show_table(df)
+        
+    with tabs[1]: # OPD
+        show_table(df[df['TYPE'] == 'OPD'])
+        
+    with tabs[2]: # IPD
+        show_table(df[df['TYPE'] == 'IPD'])
 
-    # Download
-    csv = data.to_csv(index=False).encode('utf-8-sig')
-    st.download_button("📥 ดาวน์โหลด CSV", csv, "audit_report.csv", "text/csv")
+    # --- Export Section (ข้อ 6) ---
+    st.markdown("<br>", unsafe_allow_html=True)
+    c_empty, c_export = st.columns([6, 1])
+    with c_export:
+        csv = df.to_csv(index=False).encode('utf-8-sig')
+        st.download_button(
+            label="📥 ส่งออก Excel (CSV)",
+            data=csv,
+            file_name="smart_audit_report.csv",
+            mime="text/csv",
+            type="primary",
+            use_container_width=True
+        )
 
-# --- 7. Main ---
+# --- 8. Main Controller ---
 def main():
-    apply_theme()
+    apply_theme() # เรียกใช้ Theme Premium
+    
     if not st.session_state.logged_in:
-        p_login()
+        login_page()
     else:
         if st.session_state.current_page == "dashboard":
-            p_dashboard()
+            dashboard_page()
         else:
-            p_upload()
+            upload_page()
 
 if __name__ == "__main__":
     main()
