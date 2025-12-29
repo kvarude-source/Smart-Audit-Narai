@@ -24,13 +24,16 @@ try:
         HAS_AI_CONNECTION = True
         AI_ERROR_MSG = ""
     else:
-        # กรณีลืมตั้งค่า Secrets
-        HAS_AI_CONNECTION = False
-        AI_ERROR_MSG = "⚠️ ไม่พบ GOOGLE_API_KEY ใน Secrets กรุณาตั้งค่าที่เมนู App Settings"
+        # กรณีรันในเครื่องตัวเอง (Hardcode Key เพื่อทดสอบ)
+        # ใส่ Key ของคุณที่นี่ได้เลยครับ
+        HARDCODED_KEY = "AIzaSyCW-ITlPRTPWjEzOieG8KdYU1Gh8Hg-gy0" 
+        genai.configure(api_key=HARDCODED_KEY)
+        HAS_AI_CONNECTION = True
+        AI_ERROR_MSG = ""
 
 except ImportError:
     HAS_AI_CONNECTION = False
-    AI_ERROR_MSG = "⚠️ ไม่พบ Library 'google-generativeai' (กรุณาตรวจสอบ requirements.txt)"
+    AI_ERROR_MSG = "⚠️ ไม่พบ Library 'google-generativeai'"
 except Exception as e:
     HAS_AI_CONNECTION = False
     AI_ERROR_MSG = f"⚠️ เกิดข้อผิดพลาด: {str(e)}"
@@ -57,24 +60,20 @@ def apply_theme():
         
         :root { --primary-color: #1565C0; }
         
-        /* Force Light Mode & Colors */
         html, body, [class*="css"] {
             font-family: 'Prompt', sans-serif;
             background-color: #F8FAFC !important;
             color: #334155 !important;
         }
         
-        /* Sidebar */
         section[data-testid="stSidebar"] {
             background-color: #FFFFFF !important;
             border-right: 1px solid #E2E8F0;
         }
         section[data-testid="stSidebar"] * { color: #1E3A8A !important; }
         
-        /* Headers */
         h1, h2, h3 { color: #1565C0 !important; font-weight: 700 !important; }
         
-        /* Inputs */
         .stTextInput input, .stPasswordInput input {
             background-color: #FFFFFF !important;
             color: #1E3A8A !important;
@@ -82,7 +81,6 @@ def apply_theme():
             border-radius: 8px;
         }
         
-        /* Table */
         [data-testid="stDataFrame"] {
             background-color: #FFFFFF !important;
             border: 1px solid #E2E8F0;
@@ -94,7 +92,6 @@ def apply_theme():
             color: #334155 !important;
         }
         
-        /* Buttons */
         div.stButton > button {
             background-color: #1565C0 !important;
             color: white !important;
@@ -106,7 +103,6 @@ def apply_theme():
             background-color: #0D47A1 !important;
         }
         
-        /* Login Box */
         .login-box {
             background: white !important;
             padding: 40px;
@@ -116,7 +112,6 @@ def apply_theme():
             border-top: 5px solid #1565C0;
         }
         
-        /* Metric Card */
         .metric-card {
             background: white !important;
             padding: 20px;
@@ -126,7 +121,6 @@ def apply_theme():
             text-align: center;
         }
         
-        /* Chat Bubble */
         .stChatMessage {
             background-color: #FFFFFF !important;
             border: 1px solid #E2E8F0;
@@ -142,7 +136,7 @@ if 'summary' not in st.session_state: st.session_state.summary = {}
 if 'current_page' not in st.session_state: st.session_state.current_page = "login"
 if 'chat_history' not in st.session_state: 
     st.session_state.chat_history = [
-        {"role": "assistant", "content": "สวัสดีครับ ผมคือ AI Consultant 🤖 ประจำโรงพยาบาลพระนารายณ์มหาราช \n\nท่านสามารถปรึกษาเรื่องกฎการ Audit, ถามวิธีแก้ Error Code หรือขอคำแนะนำเรื่องการเบิกจ่ายได้เลยครับ"}
+        {"role": "assistant", "content": "สวัสดีครับ ผมคือ AI Consultant 🤖 ประจำโรงพยาบาลพระนารายณ์มหาราช \n\nผมพร้อมให้คำปรึกษาแล้วครับ ถามมาได้เลยครับ"}
     ]
 
 # --- 5. Mock Logic ---
@@ -187,45 +181,32 @@ def process_data_mock(uploaded_files):
     imp = df['IMPACT'].sum()
     return df, {"records": 166196, "pre_audit": pre, "post_audit": pre + imp, "impact": imp}
 
-# --- 6. AI Logic (Connected to Gemini) ---
+# --- 6. AI Logic (Connected to Gemini - FIXED) ---
 def get_ai_response(user_input):
-    """
-    ฟังก์ชันเชื่อมต่อ Gemini Pro เพื่อตอบคำถามจริง
-    """
-    # 1. เช็คสถานะการเชื่อมต่อ
     if not HAS_AI_CONNECTION:
         return f"{AI_ERROR_MSG}"
 
     try:
-        # 2. เตรียม Context ข้อมูล
         summary_text = "ไม่มีข้อมูล Audit ในขณะนี้"
         if st.session_state.summary:
             s = st.session_state.summary
             summary_text = f"ยอด Record={s['records']:,}, ยอด Impact={s['impact']:,.0f} บาท"
 
-        # 3. สร้าง Prompt ส่งให้ AI
         system_prompt = f"""
         บทบาท: คุณคือ AI Consultant ผู้เชี่ยวชาญด้านเวชระเบียนและ Audit ของโรงพยาบาลพระนารายณ์มหาราช
-        
-        ข้อมูลบริบทปัจจุบัน: {summary_text}
-        
-        หน้าที่:
-        1. ตอบคำถามเกี่ยวกับการตรวจสอบเวชระเบียน (Audit) และการเบิกจ่าย (Claim)
-        2. อธิบายศัพท์เทคนิค เช่น Overclaim, Underclaim, DRG, RW
-        3. ให้คำแนะนำวิธีแก้ไข Error 52 แฟ้ม อย่างสุภาพและเป็นทางการ
-        4. ตอบสั้นกระชับ เข้าใจง่าย ภาษาไทย
-        
-        คำถามจากผู้ใช้: {user_input}
+        ข้อมูลปัจจุบัน: {summary_text}
+        หน้าที่: ตอบคำถามเรื่อง Audit และการเบิกจ่าย ตอบสั้นกระชับ สุภาพ ภาษาไทย
+        คำถาม: {user_input}
         """
 
-        # 4. เรียกใช้งาน Gemini (Google AI)
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        # *** แก้ไขตรงนี้ครับ ใช้ gemini-pro ที่เสถียรกว่า ***
+        model = genai.GenerativeModel('gemini-pro') 
         response = model.generate_content(system_prompt)
         
         return response.text
 
     except Exception as e:
-        return f"เกิดข้อผิดพลาดในการเชื่อมต่อ AI: {str(e)}"
+        return f"เกิดข้อผิดพลาด: {str(e)}"
 
 # --- 7. Helper UI ---
 def render_card(title, value, sub_text=None, is_impact=False):
@@ -233,10 +214,10 @@ def render_card(title, value, sub_text=None, is_impact=False):
     if is_impact:
         val_num = float(str(value).replace(',','').replace(' ฿','').replace('+',''))
         if val_num < 0:
-            style_color = "color: #EF4444;" # Red
+            style_color = "color: #EF4444;"
             sub_text = "▼ Overclaim (เสี่ยงเรียกคืน)"
         elif val_num > 0:
-            style_color = "color: #10B981;" # Green
+            style_color = "color: #10B981;"
             sub_text = "▲ Underclaim (เบิกเพิ่มได้)"
     
     st.markdown(f"""
@@ -377,7 +358,6 @@ def chat_page():
             st.markdown(prompt)
 
         with st.spinner("AI กำลังคิด..."):
-            # เรียกใช้ฟังก์ชัน AI ของจริง (Gemini)
             response = get_ai_response(prompt)
             
         st.session_state.chat_history.append({"role": "assistant", "content": response})
