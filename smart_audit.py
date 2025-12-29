@@ -9,12 +9,12 @@ st.set_page_config(
     page_title="SMART Audit AI - โรงพยาบาลพระนารายณ์มหาราช",
     page_icon="🏥",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded" # บังคับเปิดแถบซ้ายเพื่อให้เห็นปุ่ม AI
 )
 
 # --- 2. Resources (Logo) ---
 def get_base64_logo():
-    # SVG Logo (Blue/Gold Theme)
+    # SVG Logo (Blue/Gold)
     svg = """
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100" height="100">
       <path fill="#1565C0" d="M256 0C114.6 0 0 114.6 0 256s114.6 256 256 256 256-114.6 256-256S397.4 0 256 0zm0 472c-119.3 0-216-96.7-216-216S136.7 40 256 40s216 96.7 216 216-96.7 216-216 216z"/>
@@ -26,96 +26,96 @@ def get_base64_logo():
 LOGO_HTML = f'<img src="data:image/svg+xml;base64,{get_base64_logo()}" width="100">'
 LOGO_SMALL = f'<img src="data:image/svg+xml;base64,{get_base64_logo()}" width="50" style="vertical-align:middle; margin-right:10px;">'
 
-# --- 3. CSS Styling (Blue/White Theme - NO BLACK) ---
+# --- 3. CSS Styling (FORCE LIGHT THEME & NO BLACK) ---
 def apply_theme():
     st.markdown("""
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;700&display=swap');
         
-        /* Global Font & Colors */
+        /* 1. FORCE LIGHT THEME VARIABLES (แก้ปัญหาจอดำ) */
+        :root {
+            --primary-color: #1565C0;
+            --background-color: #FFFFFF;
+            --secondary-background-color: #F0F2F6;
+            --text-color: #31333F;
+            --font: "Prompt", sans-serif;
+        }
+        
+        /* Global Reset */
         html, body, [class*="css"] {
             font-family: 'Prompt', sans-serif;
-            color: #334155; /* Slate 700 */
+            background-color: #F8FAFC !important; /* บังคับพื้นหลังขาว-ฟ้า */
+            color: #334155 !important; /* บังคับตัวหนังสือสีเทาเข้ม (ห้ามขาว/ดำสนิท) */
         }
         
-        /* Background */
-        .stApp { background-color: #F8FAFC; }
-        
-        /* Sidebar */
+        /* Sidebar (แถบซ้าย) */
         section[data-testid="stSidebar"] {
-            background-color: #FFFFFF;
+            background-color: #FFFFFF !important;
             border-right: 1px solid #E2E8F0;
         }
-        section[data-testid="stSidebar"] h1, section[data-testid="stSidebar"] span, section[data-testid="stSidebar"] p {
+        section[data-testid="stSidebar"] * {
             color: #1E3A8A !important;
         }
         
         /* Headers */
         h1, h2, h3 { color: #1565C0 !important; font-weight: 700 !important; }
         
-        /* Inputs */
+        /* 2. INPUT FIELDS (บังคับพื้นขาว ขอบฟ้า) */
         .stTextInput input, .stPasswordInput input {
             background-color: #FFFFFF !important;
             color: #1E3A8A !important;
             border: 2px solid #BFDBFE !important;
-            border-radius: 8px !important;
-            padding: 10px !important;
-        }
-        
-        /* Buttons */
-        div.stButton > button {
-            background-color: #1565C0;
-            color: white !important;
             border-radius: 8px;
-            border: none;
-            padding: 10px 24px;
-            font-weight: 600;
-            box-shadow: 0 4px 6px rgba(21, 101, 192, 0.2);
-            transition: all 0.3s ease;
-        }
-        div.stButton > button:hover {
-            background-color: #0D47A1;
-            transform: translateY(-2px);
         }
         
-        /* Metric Cards */
-        .metric-card {
-            background: white; padding: 20px; border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-            border-left: 5px solid #1565C0; text-align: center;
-        }
-        .metric-title { font-size: 14px; color: #64748B; font-weight: 600; }
-        .metric-value { font-size: 28px; color: #1E3A8A; font-weight: 800; margin-top: 5px; }
-        .metric-sub { font-size: 13px; margin-top: 5px; }
-        
-        /* Table */
+        /* 3. TABLE/DATAFRAME (แก้ตารางดำ) */
         [data-testid="stDataFrame"] {
             background-color: #FFFFFF !important;
             border: 1px solid #E2E8F0;
             border-radius: 10px;
             padding: 10px;
         }
-        
-        /* Chat Interface Styling (Blue/White) */
-        .stChatMessage {
-            background-color: #FFFFFF;
-            border: 1px solid #E2E8F0;
-            border-radius: 12px;
-            padding: 15px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        [data-testid="stDataFrame"] * {
+            background-color: #FFFFFF !important;
+            color: #334155 !important;
         }
-        [data-testid="stChatMessageAvatarAssistant"] {
+        
+        /* 4. BUTTONS (สีน้ำเงิน) */
+        div.stButton > button {
             background-color: #1565C0 !important;
+            color: white !important;
+            border-radius: 8px;
+            border: none;
+            box-shadow: 0 4px 6px rgba(21, 101, 192, 0.2);
         }
-        [data-testid="stChatMessageAvatarUser"] {
-            background-color: #FFD700 !important;
+        div.stButton > button:hover {
+            background-color: #0D47A1 !important;
         }
         
-        /* Login Container */
+        /* Login Box */
         .login-box {
-            background: white; padding: 40px; border-radius: 16px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.05); text-align: center;
+            background: white !important;
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+            text-align: center;
             border-top: 5px solid #1565C0;
+        }
+        
+        /* Metric Card */
+        .metric-card {
+            background: white !important;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            border-left: 5px solid #1565C0;
+            text-align: center;
+        }
+        
+        /* Chat Bubble */
+        .stChatMessage {
+            background-color: #FFFFFF !important;
+            border: 1px solid #E2E8F0;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -128,7 +128,7 @@ if 'summary' not in st.session_state: st.session_state.summary = {}
 if 'current_page' not in st.session_state: st.session_state.current_page = "login"
 if 'chat_history' not in st.session_state: 
     st.session_state.chat_history = [
-        {"role": "assistant", "content": "สวัสดีครับ ผมคือ AI Consultant ประจำโรงพยาบาลพระนารายณ์มหาราช 🏥 \n\nต้องการปรึกษาเรื่อง Audit ข้อมูลด้านไหนสอบถามได้เลยครับ"}
+        {"role": "assistant", "content": "สวัสดีครับ ผมคือ AI Consultant 🤖 \nต้องการปรึกษาเรื่อง Audit ข้อมูลด้านไหนสอบถามได้เลยครับ"}
     ]
 
 # --- 5. Mock Logic ---
@@ -137,7 +137,7 @@ def process_data_mock(uploaded_files):
     my_bar = st.progress(0, text=progress_text)
 
     for percent_complete in range(100):
-        time.sleep(0.015) 
+        time.sleep(0.01) 
         my_bar.progress(percent_complete + 1, text=progress_text)
     
     time.sleep(0.2)
@@ -187,7 +187,7 @@ def get_ai_response(user_input):
     elif "impact" in user_input or "เงิน" in user_input:
         return f"สถานะทางการเงินตอนนี้: **{summary_text}** ครับ \n\nส่วนที่เป็นสีแดง (Overclaim) คือความเสี่ยงที่อาจถูกเรียกเงินคืน ผมแนะนำให้แก้ไขกลุ่มนี้ก่อนเป็นลำดับแรกครับ"
     else:
-        return "ผมพร้อมให้คำปรึกษาครับ ท่านสามารถถามเกี่ยวกับ \n- วิธีแก้ Error \n- การลงรหัสหัตถการ \n- หรือวิเคราะห์แนวโน้มการเงิน \n\nพิมพ์คำถามมาได้เลยครับ! 😊"
+        return "ผมพร้อมให้คำปรึกษาครับ พิมพ์คำถามมาได้เลยครับ 😊"
 
 # --- 6. Helper UI ---
 def render_card(title, value, sub_text=None, is_impact=False):
@@ -203,25 +203,29 @@ def render_card(title, value, sub_text=None, is_impact=False):
     
     st.markdown(f"""
     <div class="metric-card">
-        <div class="metric-title">{title}</div>
-        <div class="metric-value" style="{style_color}">{value}</div>
-        <div class="metric-sub" style="{style_color}">{sub_text if sub_text else '&nbsp;'}</div>
+        <div style="font-size:14px; color:#64748B;">{title}</div>
+        <div style="font-size:28px; font-weight:800; margin-top:5px; {style_color}">{value}</div>
+        <div style="font-size:13px; margin-top:5px; {style_color}">{sub_text if sub_text else '&nbsp;'}</div>
     </div>
     """, unsafe_allow_html=True)
 
 # --- 7. Pages ---
 
 def login_page():
+    # Center Logic using Columns
     c1, c2, c3 = st.columns([1, 1.5, 1])
     with c2:
         st.markdown("<br><br><br>", unsafe_allow_html=True)
         st.markdown('<div class="login-box">', unsafe_allow_html=True)
+        
+        # Logo & Text Centered
         st.markdown(LOGO_HTML, unsafe_allow_html=True)
         st.markdown('<h2 style="margin-top:20px; color:#1565C0;">โรงพยาบาลพระนารายณ์มหาราช</h2>', unsafe_allow_html=True)
         st.markdown('<p style="color:#64748B;">SMART Audit AI System</p>', unsafe_allow_html=True)
         st.markdown("<br>", unsafe_allow_html=True)
         
         with st.form("login"):
+            # Inputs will be forced White by CSS
             st.text_input("Username", key="u_input")
             st.text_input("Password", type="password", key="p_input")
             st.markdown("<br>", unsafe_allow_html=True)
@@ -229,7 +233,7 @@ def login_page():
                 if st.session_state.u_input.lower().strip() == "hosnarai" and st.session_state.p_input.strip() == "h15000":
                     st.session_state.logged_in = True
                     st.session_state.username = "Hosnarai"
-                    st.session_state.current_page = "upload"
+                    st.session_state.current_page = "upload" # ไปหน้า Upload ก่อน
                     st.rerun()
                 else:
                     st.error("รหัสผ่านไม่ถูกต้อง")
@@ -238,7 +242,7 @@ def login_page():
 def upload_page():
     c1, c2 = st.columns([4, 1])
     with c1:
-        st.markdown(f"<div style='display:flex;align-items:center;'>{LOGO_SMALL}<h2 style='margin:0'>Data Import Center</h2></div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='display:flex;align-items:center;'>{LOGO_SMALL}<h2 style='margin:0; color:#1565C0;'>Data Import Center</h2></div>", unsafe_allow_html=True)
     with c2:
         st.markdown(f"<div style='text-align:right;padding-top:10px;color:#1E3A8A;'><b>{st.session_state.username}</b></div>", unsafe_allow_html=True)
     
@@ -257,6 +261,7 @@ def upload_page():
         c1, c2, c3 = st.columns([1, 1, 1])
         with c2:
             if st.button("🚀 เริ่มวิเคราะห์ (Start Audit)", type="primary", use_container_width=True):
+                # Progress Bar inside process function
                 df, summ = process_data_mock(uploaded)
                 st.session_state.audit_data = df
                 st.session_state.summary = summ
@@ -266,7 +271,7 @@ def upload_page():
 def dashboard_page():
     c1, c2 = st.columns([4, 1.2])
     with c1:
-        st.markdown(f"<div style='display:flex;align-items:center;'>{LOGO_SMALL}<h2 style='margin:0'>Executive Dashboard</h2></div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='display:flex;align-items:center;'>{LOGO_SMALL}<h2 style='margin:0; color:#1565C0;'>Executive Dashboard</h2></div>", unsafe_allow_html=True)
     with c2:
         st.markdown("<br>", unsafe_allow_html=True)
         if st.button("↺ วิเคราะห์ใหม่", use_container_width=True):
@@ -289,7 +294,10 @@ def dashboard_page():
     
     t1, t2, t3 = st.tabs(["📋 ALL (ทั้งหมด)", "🩺 OPD (ผู้ป่วยนอก)", "🛏️ IPD (ผู้ป่วยใน)"])
     df = st.session_state.audit_data
-    df_filtered = df[df['IMPACT'] != 0] # Filter out Impact = 0
+    
+    # Filter Impact = 0 Out!
+    df_filtered = df[df['IMPACT'] != 0]
+    
     df_filtered['HN_AN_SHOW'] = df_filtered.apply(lambda x: x['AN'] if x['TYPE']=='IPD' else x['HN'], axis=1)
     
     cfg = {
@@ -321,7 +329,7 @@ def dashboard_page():
 def chat_page():
     c1, c2 = st.columns([4, 1])
     with c1:
-        st.markdown(f"<div style='display:flex;align-items:center;'>{LOGO_SMALL}<h2 style='margin:0'>AI Consultant</h2></div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='display:flex;align-items:center;'>{LOGO_SMALL}<h2 style='margin:0; color:#1565C0;'>AI Consultant</h2></div>", unsafe_allow_html=True)
     with c2:
         if st.button("⬅️ กลับ Dashboard"):
             st.session_state.current_page = "dashboard"
@@ -360,7 +368,7 @@ def main():
                 st.session_state.current_page = "dashboard"
                 st.rerun()
             
-            # --- ปุ่มที่นำกลับมา ---
+            # --- ปุ่ม AI Consultant กลับมาแล้ว ---
             if st.button("💬 AI Consultant"):
                 st.session_state.current_page = "chat"
                 st.rerun()
