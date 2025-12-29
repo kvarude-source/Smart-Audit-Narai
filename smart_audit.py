@@ -15,15 +15,15 @@ except ImportError:
 
 # --- 1. Config & Setup ---
 st.set_page_config(
-    page_title="SMART Audit AI - โรงพยาบาลพระนารายณ์มหาราช",
+    page_title="SMART Audit AI - Executive",
     page_icon="🏥",
     layout="wide",
-    initial_sidebar_state="collapsed" # ซ่อน Sidebar เพื่อความ Clean แบบ Executive
+    initial_sidebar_state="collapsed"
 )
 
 # --- 2. Resources (Logo) ---
 def get_base64_logo():
-    # SVG Logo (Navy/Gold Theme)
+    # Logo SVG (Premium Navy/Gold)
     svg = """
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100" height="100">
       <path fill="#0F172A" d="M256 0C114.6 0 0 114.6 0 256s114.6 256 256 256 256-114.6 256-256S397.4 0 256 0zm0 472c-119.3 0-216-96.7-216-216S136.7 40 256 40s216 96.7 216 216-96.7 216-216 216z"/>
@@ -32,91 +32,116 @@ def get_base64_logo():
     """
     return base64.b64encode(svg.encode('utf-8')).decode("utf-8")
 
-LOGO_HTML = f'<img src="data:image/svg+xml;base64,{get_base64_logo()}" width="80" style="vertical-align:middle; margin-right:15px;">'
+LOGO_HTML = f'<img src="data:image/svg+xml;base64,{get_base64_logo()}" width="90" style="vertical-align:middle; margin-right:15px;">'
 
-# --- 3. CSS Styling (Premium Theme: White/Blue/Gold) ---
+# --- 3. CSS Styling (Ultra Premium & Large Font) ---
 def apply_theme():
     st.markdown("""
         <style>
-        @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;600&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;700&display=swap');
         
-        /* Global Settings */
-        .stApp {
-            background-color: #F8FAFC; /* สีพื้นหลังขาวอมฟ้าจางๆ */
+        /* 1. Global Font Upsizing (ขยายฟอนต์ทั้งระบบ) */
+        html, body, [class*="css"] {
             font-family: 'Prompt', sans-serif;
+            font-size: 18px !important; /* เพิ่มขนาดฐาน */
+            color: #1E293B; /* สีน้ำเงินเข้ม */
         }
         
-        /* Text Colors */
-        h1, h2, h3, h4, p, div, span, label {
-            color: #1E293B; /* สีน้ำเงินเข้มเกือบดำ */
+        /* 2. Background Clean White/Blue */
+        .stApp {
+            background-color: #F8FAFC;
         }
         
-        /* Login Box Styling */
-        .login-container {
-            background: white;
-            padding: 40px;
-            border-radius: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.08);
-            border-top: 6px solid #D4AF37; /* ขลิบทอง */
-            text-align: center;
+        /* 3. Headers (ใหญ่และชัด) */
+        h1 { font-size: 3rem !important; font-weight: 700 !important; color: #0F172A !important; }
+        h2 { font-size: 2.2rem !important; font-weight: 700 !important; color: #0F172A !important; }
+        h3 { font-size: 1.8rem !important; font-weight: 600 !important; color: #1E293B !important; }
+        p { font-size: 1.1rem !important; color: #475569 !important; }
+        
+        /* 4. Input Fields (แก้สีดำให้เป็นขาวสะอาด) */
+        .stTextInput input, .stPasswordInput input {
+            background-color: #FFFFFF !important;
+            color: #0F172A !important;
+            border: 2px solid #E2E8F0 !important;
+            border-radius: 10px !important;
+            padding: 15px !important;
+            font-size: 18px !important;
+        }
+        .stTextInput input:focus, .stPasswordInput input:focus {
+            border-color: #D4AF37 !important; /* Focus สีทอง */
+            box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.2) !important;
+        }
+        /* Label ของ Input */
+        .stTextInput label, .stPasswordInput label {
+            font-size: 18px !important;
+            font-weight: 600 !important;
+            color: #1E293B !important;
         }
         
-        /* Metric Cards */
-        .metric-card {
-            background: white;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-            border-left: 5px solid #0F172A; /* ขลิบน้ำเงิน */
-            transition: transform 0.2s;
-        }
-        .metric-card:hover { transform: translateY(-3px); }
-        .metric-card.impact { border-left: 5px solid #D4AF37; } /* ขลิบทองสำหรับ Impact */
-        
-        .metric-title { font-size: 14px; color: #64748B; font-weight: 600; text-transform: uppercase; }
-        .metric-value { font-size: 26px; color: #0F172A; font-weight: bold; margin-top: 5px; }
-        .metric-sub { font-size: 12px; margin-top: 5px; }
-        
-        /* Buttons */
+        /* 5. Buttons (ใหญ่ พรีเมี่ยม) */
         div.stButton > button {
-            background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+            background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%) !important;
             color: #FFFFFF !important;
-            border: none;
-            border-radius: 8px;
-            padding: 10px 24px;
-            font-weight: 500;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border: none !important;
+            border-radius: 12px !important;
+            padding: 12px 32px !important;
+            font-size: 20px !important; /* ตัวหนังสือปุ่มใหญ่ */
+            font-weight: 600 !important;
+            box-shadow: 0 4px 15px rgba(15, 23, 42, 0.2) !important;
+            transition: all 0.3s ease !important;
         }
         div.stButton > button:hover {
-            background: #1E293B;
-            box-shadow: 0 6px 10px rgba(0,0,0,0.15);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.3) !important;
         }
         
-        /* Tabs Customization */
-        .stTabs [data-baseweb="tab-list"] {
-            gap: 10px;
-            background-color: transparent;
+        /* 6. Metric Cards (การ์ดแสดงผล) */
+        .metric-card {
+            background: white;
+            padding: 25px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);
+            border-left: 8px solid #0F172A;
+            transition: transform 0.2s;
         }
+        .metric-card:hover { transform: scale(1.02); }
+        .metric-title { font-size: 16px; color: #64748B; font-weight: 600; letter-spacing: 0.5px; }
+        .metric-value { font-size: 36px; color: #0F172A; font-weight: 800; margin-top: 10px; }
+        .metric-sub { font-size: 14px; font-weight: 500; margin-top: 5px; }
+        
+        /* 7. Tabs (แถบเลือก) */
+        .stTabs [data-baseweb="tab-list"] { gap: 8px; }
         .stTabs [data-baseweb="tab"] {
-            height: 45px;
-            background-color: #FFFFFF;
-            border-radius: 8px;
-            border: 1px solid #E2E8F0;
+            height: 60px; /* สูงขึ้น */
+            font-size: 20px !important; /* ตัวหนังสือใหญ่ */
+            background-color: #F1F5F9;
+            border-radius: 10px 10px 0 0;
             color: #64748B;
             font-weight: 600;
         }
         .stTabs [data-baseweb="tab"][aria-selected="true"] {
-            background-color: #0F172A;
-            color: #FFFFFF;
-            border: 1px solid #0F172A;
+            background-color: #FFFFFF;
+            color: #0F172A;
+            border-top: 4px solid #D4AF37; /* แถบทองด้านบน */
         }
         
-        /* Table Styling */
+        /* 8. Table/Dataframe (พื้นขาว ตัวใหญ่) */
         [data-testid="stDataFrame"] {
-            background-color: white;
-            padding: 10px;
-            border-radius: 12px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            background-color: white !important;
+            padding: 15px;
+            border-radius: 15px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+            font-size: 16px !important;
+        }
+        
+        /* Login Box Specific */
+        .login-box {
+            background: white;
+            padding: 50px;
+            border-radius: 24px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.1);
+            border-top: 8px solid #D4AF37;
+            text-align: center;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -127,263 +152,228 @@ if 'audit_data' not in st.session_state: st.session_state.audit_data = None
 if 'summary' not in st.session_state: st.session_state.summary = {}
 if 'current_page' not in st.session_state: st.session_state.current_page = "login"
 
-# --- 5. Logic & Processing ---
-
+# --- 5. Logic Processing (Mock Logic) ---
 def process_data_mock(uploaded_files):
-    """
-    ฟังก์ชันจำลองการประมวลผลและสร้าง Dataframe
-    (ในระบบจริงจะอ่านจาก uploaded_files)
-    """
-    time.sleep(1.5) # Simulate processing time
+    time.sleep(1.2) # Simulate calculation
     
-    # สร้าง Mock Data จำนวน 100 รายการ
     data = []
-    pttypes = ['UCS', 'OFC', 'SSS', 'LGO'] # สิทธิการรักษา
+    pttypes = ['UCS (บัตรทอง)', 'OFC (ข้าราชการ)', 'SSS (ประกันสังคม)', 'LGO (อปท.)']
     
-    for i in range(100):
+    # Generate Mock Data (High quality mock)
+    for i in range(150):
         is_ipd = np.random.choice([True, False], p=[0.3, 0.7])
         hn = f"{np.random.randint(60000, 69999):05d}"
         an = f"{np.random.randint(10000, 19999):05d}" if is_ipd else "-"
         date_serv = f"2024-{np.random.randint(1,13):02d}-{np.random.randint(1,28):02d}"
         pttype = np.random.choice(pttypes)
         
-        # Random Case Generation
-        case_type = np.random.choice(['Normal', 'Overclaim', 'Underclaim'], p=[0.7, 0.2, 0.1])
+        case_type = np.random.choice(['Normal', 'Overclaim', 'Underclaim'], p=[0.6, 0.25, 0.15])
         
         finding = "-"
         action = "-"
         impact = 0
         
         if case_type == 'Overclaim':
-            finding = "วันจำหน่ายก่อนวันรับเข้า (Date Mismatch)"
-            action = "ตรวจสอบและแก้ไขวันที่ (DATEDSC)"
-            impact = -1 * np.random.randint(500, 5000) # ติดลบ = Overclaim (ต้องคืนเงิน)
+            finding = "วันจำหน่ายก่อนวันรับเข้า (Date Error)"
+            action = "แก้ไขวันที่ (DATEDSC) ให้ถูกต้อง"
+            impact = -1 * np.random.randint(1000, 10000)
         elif case_type == 'Underclaim':
             finding = "ไม่ได้ลงรหัสหัตถการ (Missing Proc)"
-            action = "เพิ่มรหัสหัตถการเพื่อเบิกเพิ่ม"
-            impact = np.random.randint(500, 3000) # บวก = Underclaim (ได้เงินเพิ่ม)
+            action = "เพิ่มรหัสหัตถการ (ICD-9) เพื่อเบิกเพิ่ม"
+            impact = np.random.randint(500, 5000)
             
         data.append({
-            "HN": hn,
-            "AN": an,
-            "DATE": date_serv,
-            "PTTYPE": pttype,
-            "FINDING": finding,
-            "ACTION": action,
-            "IMPACT": impact,
+            "HN": hn, "AN": an, "DATE": date_serv, "PTTYPE": pttype,
+            "FINDING": finding, "ACTION": action, "IMPACT": impact,
             "TYPE": "IPD" if is_ipd else "OPD"
         })
         
     df = pd.DataFrame(data)
-    
-    # Calculate Summary
-    pre_audit = 5000000.0
+    pre_audit = 8500000.0
     net_impact = df['IMPACT'].sum()
-    post_audit = pre_audit + net_impact
     
-    summary = {
-        "records": 166196, # Mock total records from files
+    return df, {
+        "records": 166196, 
         "pre_audit": pre_audit,
-        "post_audit": post_audit,
+        "post_audit": pre_audit + net_impact,
         "impact": net_impact
     }
+
+# --- 6. Helper UI ---
+def render_metric(title, value, sub_text=None, is_impact=False):
+    style_color = "color: #0F172A;" # Default Blue
+    border_style = ""
     
-    return df, summary
-
-# --- 6. Helper UI Functions ---
-
-def render_metric_card(title, value, sub_text=None, is_impact=False):
-    color_style = ""
     if is_impact:
-        # ถ้า Impact ติดลบ (Overclaim) ให้เป็นสีแดง, ถ้าบวก (Underclaim) เป็นสีเขียว
-        val_num = float(str(value).replace(',','').replace(' ฿',''))
+        val_num = float(str(value).replace(',','').replace(' ฿','').replace('+',''))
         if val_num < 0:
-            color_style = "color: #EF4444;" # Red
+            style_color = "color: #EF4444;" # Red
             sub_text = "▼ Overclaim (เสี่ยงเรียกคืน)"
+            border_style = "border-left: 8px solid #EF4444;"
         elif val_num > 0:
-            color_style = "color: #10B981;" # Green
+            style_color = "color: #10B981;" # Green
             sub_text = "▲ Underclaim (เบิกเพิ่มได้)"
-        else:
-            color_style = "color: #64748B;"
-            
-    extra_class = "impact" if is_impact else ""
+            border_style = "border-left: 8px solid #10B981;"
     
     st.markdown(f"""
-    <div class="metric-card {extra_class}">
+    <div class="metric-card" style="{border_style}">
         <div class="metric-title">{title}</div>
-        <div class="metric-value" style="{color_style}">{value}</div>
-        <div class="metric-sub" style="{color_style}">{sub_text if sub_text else ''}</div>
+        <div class="metric-value" style="{style_color}">{value}</div>
+        <div class="metric-sub" style="{style_color}">{sub_text if sub_text else '&nbsp;'}</div>
     </div>
     """, unsafe_allow_html=True)
 
 # --- 7. Pages ---
 
 def login_page():
-    col1, col2, col3 = st.columns([1, 1.2, 1])
-    with col2:
+    c1, c2, c3 = st.columns([1, 1.5, 1])
+    with c2:
         st.markdown("<br><br>", unsafe_allow_html=True)
+        
         # Login Container
-        st.markdown('<div class="login-container">', unsafe_allow_html=True)
-        
-        # Logo & Hospital Name
+        st.markdown('<div class="login-box">', unsafe_allow_html=True)
         st.markdown(LOGO_HTML, unsafe_allow_html=True)
-        st.markdown('<h2 style="margin-top:15px; color:#0F172A;">โรงพยาบาลพระนารายณ์มหาราช</h2>', unsafe_allow_html=True)
-        st.markdown('<p style="color:#64748B; font-weight:300;">SMART Audit AI System</p>', unsafe_allow_html=True)
+        st.markdown('<h1 style="margin-top:20px; font-size:2.5rem !important;">โรงพยาบาลพระนารายณ์มหาราช</h1>', unsafe_allow_html=True)
+        st.markdown('<p style="font-size:1.2rem !important; margin-bottom:30px;">SMART Audit AI System</p>', unsafe_allow_html=True)
         
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        # Login Form (แยกออกมาเพื่อให้ Streamlit จัดการ State ได้ดี)
-        st.markdown("<br>", unsafe_allow_html=True)
+        # Form
         with st.form("login_form"):
-            user = st.text_input("Username", placeholder="ระบุชื่อผู้ใช้งาน")
-            pwd = st.text_input("Password", type="password", placeholder="ระบุรหัสผ่าน")
+            st.markdown('<div style="text-align:left; font-weight:bold; margin-bottom:5px;">Username</div>', unsafe_allow_html=True)
+            user = st.text_input("Username", placeholder="ระบุชื่อผู้ใช้งาน", label_visibility="collapsed")
             
-            submit = st.form_submit_button("เข้าสู่ระบบ (Login)", use_container_width=True)
+            st.markdown('<div style="text-align:left; font-weight:bold; margin-top:15px; margin-bottom:5px;">Password</div>', unsafe_allow_html=True)
+            pwd = st.text_input("Password", type="password", placeholder="ระบุรหัสผ่าน", label_visibility="collapsed")
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+            submit = st.form_submit_button("เข้าสู่ระบบ (LOGIN)", use_container_width=True)
             
             if submit:
-                # Login Logic (Flexible)
                 if user.strip().lower() == "hosnarai" and pwd.strip() == "h15000":
                     st.session_state.logged_in = True
-                    st.session_state.current_page = "dashboard" # ไปหน้า Dashboard ทันที (ข้าม Upload ตาม Flow ใหม่ที่อาจมีข้อมูลแล้ว)
-                    # ถ้าต้องการให้ไปหน้า Upload ก่อน ให้เปลี่ยนเป็น "upload"
-                    st.session_state.current_page = "upload" 
+                    st.session_state.current_page = "upload" # ไปหน้า Upload ก่อนตาม Flow ปกติ
                     st.rerun()
                 else:
                     st.error("ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง")
+        
+        st.markdown('</div>', unsafe_allow_html=True)
 
 def upload_page():
-    # หน้า Upload แบบ Clean
-    st.markdown(f"""
-    <div style="display:flex; align-items:center; justify-content:space-between; padding:20px; background:white; border-radius:15px; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
+    # Header
+    c1, c2 = st.columns([4, 1])
+    with c1:
+        st.markdown(f"""
         <div style="display:flex; align-items:center;">
             {LOGO_HTML}
             <div>
-                <h3 style="margin:0; color:#0F172A;">โรงพยาบาลพระนารายณ์มหาราช</h3>
-                <span style="color:#64748B;">SMART Audit AI : Upload Center</span>
+                <h2 style="margin:0;">โรงพยาบาลพระนารายณ์มหาราช</h2>
+                <p style="margin:0;">ระบบนำเข้าข้อมูลเพื่อการตรวจสอบ (Data Import)</p>
             </div>
         </div>
-        <div style="text-align:right;">
-            <span style="color:#0F172A; font-weight:bold;">ยินดีต้อนรับ User: Hosnarai</span>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
+    with c2:
+        st.markdown(f"<div style='text-align:right; padding-top:20px; font-size:18px;'>👤 <b>{st.session_state.username}</b></div>", unsafe_allow_html=True)
+
+    st.markdown("---")
     
-    st.markdown("<br>", unsafe_allow_html=True)
-    
-    # Upload Area
+    # Upload Area Large
     st.markdown("""
-    <div style="background:white; padding:40px; border-radius:15px; border:2px dashed #CBD5E1; text-align:center;">
-        <h4 style="color:#0F172A;">📂 อัปโหลดไฟล์ 52 แฟ้ม</h4>
-        <p style="color:#64748B;">ลากไฟล์ทั้งหมดมาวางที่นี่เพื่อเริ่มการวิเคราะห์</p>
+    <div style="background:white; padding:60px; border-radius:20px; border:3px dashed #CBD5E1; text-align:center; margin-bottom:30px;">
+        <h3 style="color:#0F172A; font-size:2rem;">📂 อัปโหลดไฟล์ 52 แฟ้ม</h3>
+        <p style="font-size:1.2rem;">ลากไฟล์ทั้งหมดมาวางที่นี่เพื่อเริ่มการวิเคราะห์ด้วย AI</p>
     </div>
     """, unsafe_allow_html=True)
     
     uploaded_files = st.file_uploader("", type=["txt"], accept_multiple_files=True, label_visibility="collapsed")
     
     if uploaded_files:
-        st.success(f"✅ พบไฟล์จำนวน {len(uploaded_files)} ไฟล์")
-        if st.button("🚀 เริ่มวิเคราะห์ข้อมูล (Start Audit)", type="primary"):
-            with st.spinner("กำลังประมวลผลข้อมูล..."):
-                df, summ = process_data_mock(uploaded_files)
-                st.session_state.audit_data = df
-                st.session_state.summary = summ
-                st.session_state.current_page = "dashboard"
-                st.rerun()
+        st.success(f"✅ พร้อมวิเคราะห์จำนวน {len(uploaded_files)} ไฟล์")
+        c_a, c_b, c_c = st.columns([1, 1, 1])
+        with c_b:
+            if st.button("🚀 เริ่มวิเคราะห์ข้อมูล (Start Audit)", type="primary", use_container_width=True):
+                with st.spinner("AI กำลังประมวลผลข้อมูล..."):
+                    df, summ = process_data_mock(uploaded_files)
+                    st.session_state.audit_data = df
+                    st.session_state.summary = summ
+                    st.session_state.current_page = "dashboard"
+                    st.rerun()
 
 def dashboard_page():
-    # --- Header Section (ข้อ 1 & 5) ---
-    c_head1, c_head2 = st.columns([4, 1])
+    # --- Header (Logo + Title + Re-Analyze Button) ---
+    c_head1, c_head2 = st.columns([4, 1.2])
     with c_head1:
         st.markdown(f"""
         <div style="display:flex; align-items:center;">
             {LOGO_HTML}
             <div>
-                <h2 style="margin:0; color:#0F172A; font-weight:bold;">โรงพยาบาลพระนารายณ์มหาราช</h2>
-                <p style="margin:0; color:#64748B;">SMART Audit AI : Executive Summary</p>
+                <h1 style="margin:0;">โรงพยาบาลพระนารายณ์มหาราช</h1>
+                <p style="margin:0; font-size:1.2rem;">SMART Audit AI : Executive Summary</p>
             </div>
         </div>
         """, unsafe_allow_html=True)
     with c_head2:
         st.markdown("<br>", unsafe_allow_html=True)
-        # ปุ่มวิเคราะห์ใหม่ (ขวาบน)
         if st.button("↺ วิเคราะห์ใหม่", use_container_width=True):
             st.session_state.current_page = "upload"
-            st.session_state.audit_data = None
             st.rerun()
 
     st.markdown("---")
     
     if st.session_state.audit_data is None:
-        st.warning("ไม่พบข้อมูลการวิเคราะห์ กรุณาอัปโหลดไฟล์ใหม่")
+        st.warning("กรุณาอัปโหลดข้อมูลก่อน")
         return
 
-    # --- Metrics Section (ข้อ 2) ---
+    # --- Metrics (Large Cards) ---
     summ = st.session_state.summary
     m1, m2, m3, m4 = st.columns(4)
-    
-    with m1: render_metric_card("จำนวน Record", f"{summ['records']:,}", "รายการทั้งหมด")
-    with m2: render_metric_card("ยอดเงินก่อน Audit", f"{summ['pre_audit']:,.0f} ฿", "ยอดส่งเบิกตั้งต้น")
-    with m3: render_metric_card("ยอดเงินหลัง Audit", f"{summ['post_audit']:,.0f} ฿", "ยอดที่คาดว่าจะได้")
-    with m4: render_metric_card("Impact (ผลกระทบ)", f"{summ['impact']:+,.0f} ฿", is_impact=True) # มีสีแดง/เขียว
+    with m1: render_metric("จำนวน Record", f"{summ['records']:,}", "รายการทั้งหมด")
+    with m2: render_metric("ยอดเงินก่อน Audit", f"{summ['pre_audit']:,.0f} ฿", "ยอดส่งเบิกตั้งต้น")
+    with m3: render_metric("ยอดเงินหลัง Audit", f"{summ['post_audit']:,.0f} ฿", "ยอดที่คาดว่าจะได้")
+    with m4: render_metric("Impact (ผลกระทบ)", f"{summ['impact']:+,.0f} ฿", is_impact=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # --- Tabs & Table Section (ข้อ 3 & 4) ---
+    # --- Tabs & Table ---
     st.subheader("🔎 รายละเอียดผลการตรวจสอบ (Audit Findings)")
     
-    # Tabs แยกกลุ่ม
     tabs = st.tabs(["📋 ALL (ทั้งหมด)", "🩺 OPD (ผู้ป่วยนอก)", "🛏️ IPD (ผู้ป่วยใน)"])
     
     df = st.session_state.audit_data
-    
-    # Column Config (ข้อ 4)
-    # แสดง HN/AN รวมกันในคอลัมน์เดียวตามเงื่อนไข (ใน Dataframe เราแยกไว้แล้ว แต่ตอนโชว์จะใช้ Column Config)
-    # แต่เพื่อให้ง่าย เราสร้างคอลัมน์โชว์เฉพาะกิจ
     df['HN_AN_SHOW'] = df.apply(lambda x: x['AN'] if x['TYPE'] == 'IPD' else x['HN'], axis=1)
     
+    # Config Table (Big Font)
     table_cfg = {
         "HN_AN_SHOW": st.column_config.TextColumn("HN / AN", width="medium"),
         "DATE": st.column_config.TextColumn("วันที่รับบริการ", width="small"),
         "PTTYPE": st.column_config.TextColumn("สิทธิการรักษา", width="small"),
         "FINDING": st.column_config.TextColumn("⚠️ ข้อค้นพบ (Findings)", width="large"),
         "ACTION": st.column_config.TextColumn("🔧 คำแนะนำ (AI Action)", width="large"),
-        "IMPACT": st.column_config.NumberColumn(
-            "💰 Impact", 
-            format="%.0f ฿",
-            help="แดง = Overclaim (คืนเงิน), เขียว = Underclaim (ได้เพิ่ม)"
-        )
+        "IMPACT": st.column_config.NumberColumn("💰 Impact", format="%.0f ฿")
     }
-    
-    column_order = ["HN_AN_SHOW", "DATE", "PTTYPE", "FINDING", "ACTION", "IMPACT"]
+    col_order = ["HN_AN_SHOW", "DATE", "PTTYPE", "FINDING", "ACTION", "IMPACT"]
 
     def show_table(data_view):
         if not data_view.empty:
-            # Sort ให้เห็น Impact เยอะๆ ก่อน
+            # Sort by impact to show problems first
             data_view = data_view.sort_values(by="IMPACT", ascending=True)
             st.dataframe(
                 data_view,
-                column_order=column_order,
+                column_order=col_order,
                 column_config=table_cfg,
                 use_container_width=True,
-                height=500,
+                height=600, # ตารางสูงขึ้น
                 hide_index=True
             )
         else:
-            st.info("ไม่พบรายการในกลุ่มนี้")
+            st.info("ไม่พบรายการ")
 
-    with tabs[0]: # ALL
-        show_table(df)
-        
-    with tabs[1]: # OPD
-        show_table(df[df['TYPE'] == 'OPD'])
-        
-    with tabs[2]: # IPD
-        show_table(df[df['TYPE'] == 'IPD'])
+    with tabs[0]: show_table(df)
+    with tabs[1]: show_table(df[df['TYPE'] == 'OPD'])
+    with tabs[2]: show_table(df[df['TYPE'] == 'IPD'])
 
-    # --- Export Section (ข้อ 6) ---
+    # --- Export Button ---
     st.markdown("<br>", unsafe_allow_html=True)
-    c_empty, c_export = st.columns([6, 1])
-    with c_export:
+    c_left, c_right = st.columns([5, 1])
+    with c_right:
         csv = df.to_csv(index=False).encode('utf-8-sig')
         st.download_button(
             label="📥 ส่งออก Excel (CSV)",
@@ -394,10 +384,9 @@ def dashboard_page():
             use_container_width=True
         )
 
-# --- 8. Main Controller ---
+# --- 8. Main ---
 def main():
-    apply_theme() # เรียกใช้ Theme Premium
-    
+    apply_theme()
     if not st.session_state.logged_in:
         login_page()
     else:
