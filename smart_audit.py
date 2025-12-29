@@ -33,15 +33,16 @@ AI_ERROR_MSG = ""
 
 try:
     import google.generativeai as genai
+    
+    # ดึง Key จาก Secrets (ปลอดภัย 100% Google ไม่บล็อค)
     if "GOOGLE_API_KEY" in st.secrets:
         api_key = st.secrets["GOOGLE_API_KEY"]
         genai.configure(api_key=api_key)
         HAS_AI_CONNECTION = True
     else:
-        # Hardcode Key for Demo
-        KEY = "AIzaSyCW-ITlPRTPWjEzOieG8KdYU1Gh8Hg-gy0" 
-        genai.configure(api_key=KEY)
-        HAS_AI_CONNECTION = True
+        # กรณีลืมใส่ Secrets ให้แจ้งเตือน
+        AI_ERROR_MSG = "Error: Please set GOOGLE_API_KEY in Streamlit Secrets."
+
 except ImportError:
     AI_ERROR_MSG = "Error: Library not found."
 except Exception as e:
