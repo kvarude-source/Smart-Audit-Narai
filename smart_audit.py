@@ -92,14 +92,15 @@ def apply_theme():
         </style>
     """, unsafe_allow_html=True)
 
-# --- 4. Session State ---
+# --- 4. Session State (Fixed) ---
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
+if 'username' not in st.session_state: st.session_state.username = "" # เพิ่มบรรทัดนี้เพื่อแก้ Error
 if 'audit_data' not in st.session_state: st.session_state.audit_data = None
 if 'summary' not in st.session_state: st.session_state.summary = {}
 if 'current_page' not in st.session_state: st.session_state.current_page = "login"
 if 'chat_history' not in st.session_state: 
     st.session_state.chat_history = [
-        {"role": "assistant", "content": "สวัสดีครับ ผมคือ AI Consultant ประจำโรงพยาบาลพระนารายณ์มหาราช 🏥 \n\nผมได้วิเคราะห์ข้อมูลของคุณเรียบร้อยแล้ว มีข้อผิดพลาดที่น่าสนใจเกี่ยวกับ **วันจำหน่าย (Date Error)** และ **รหัสหัตถการ** ครับ \n\nต้องการให้ผมช่วยแนะนำวิธีแก้ไขจุดไหนเป็นพิเศษไหมครับ?"}
+        {"role": "assistant", "content": "สวัสดีครับ ผมคือ AI Consultant ประจำโรงพยาบาลพระนารายณ์มหาราช 🏥 \n\nผมพร้อมให้คำปรึกษาเรื่อง Audit ข้อมูลครับ"}
     ]
 
 # --- 5. Logic & Mock Data ---
@@ -138,35 +139,20 @@ def process_data_mock(uploaded_files):
     
     return df, {"records": 166196, "pre_audit": pre, "post_audit": pre + imp, "impact": imp}
 
-# --- 6. AI Consultant Logic (The Brain) ---
+# --- 6. AI Consultant Logic ---
 def get_ai_response(user_input):
-    """
-    ฟังก์ชันจำลองสมอง AI (ในระบบจริง เราจะยิง API ไปหา OpenAI/Gemini ตรงนี้)
-    """
     user_input = user_input.lower()
-    
-    # ดึง Context จากข้อมูล Audit ปัจจุบัน
     summary_text = ""
     if st.session_state.summary:
         summ = st.session_state.summary
         summary_text = f"ยอด Impact รวมอยู่ที่ {summ['impact']:,.0f} บาท"
     
-    # Rule-based Response Simulation (เหมือนมีผู้เชี่ยวชาญมาตอบ)
     if "date" in user_input or "วัน" in user_input:
-        return f"สำหรับปัญหาเรื่อง **วันที่ (Date Error)** 📅 \n\nมักเกิดจากฟิลด์ `DATEDSC` (วันจำหน่าย) ลงเวลาเร็วกว่า `DATEADM` (วันรับเข้า) ครับ \n\n**วิธีแก้ไข:** \n1. ตรวจสอบเวชระเบียนผู้ป่วยรายนั้น \n2. แก้ไขวันที่ในระบบ HIS ให้ถูกต้อง \n3. ส่งออก 52 แฟ้มใหม่อีกครั้งครับ \n\n(ระบบพบปัญหานี้บ่อยในกลุ่ม IPD ครับ)"
-    
-    elif "หัตถการ" in user_input or "proc" in user_input:
-        return "เรื่อง **รหัสหัตถการ (Procedure)** หาย 🛠️ \n\nAI ตรวจพบว่ามีการเบิกค่าบริการห้องผ่าตัดหรือทำแผล แต่ไม่มีรหัส ICD-9-CM รองรับครับ ทำให้เสียโอกาสในการเบิกเงิน (Underclaim) \n\n**คำแนะนำ:** ให้ Coder ตรวจสอบ Note พยาบาลและลงรหัสเพิ่มครับ จะช่วยเพิ่มค่าน้ำหนัก AdjRW ได้ครับ"
-        
-    elif "ยา" in user_input or "drug" in user_input:
-        return "กรณี **ยา (Drug)** 💊 \n\nปัญหาที่พบบ่อยคือรหัสยา 24 หลักไม่ตรงมาตรฐาน (DIDSTD) หรือมีการสั่งยาแต่ไม่มี Diagnosis ที่สอดคล้องกันครับ แนะนำให้ตรวจสอบ Mapping รหัสยาในระบบห้องยาครับ"
-    
+        return f"สำหรับปัญหาเรื่อง **วันที่ (Date Error)** 📅 \n\nมักเกิดจากฟิลด์ `DATEDSC` (วันจำหน่าย) ลงเวลาเร็วกว่า `DATEADM` (วันรับเข้า) ครับ \n\n**วิธีแก้ไข:** \n1. ตรวจสอบเวชระเบียน \n2. แก้ไขวันที่ในระบบ HIS \n3. ส่งออกข้อมูลใหม่อีกครั้ง"
     elif "impact" in user_input or "เงิน" in user_input:
-        return f"สถานะทางการเงินตอนนี้: **{summary_text}** ครับ \n\nส่วนที่เป็นสีแดง (Overclaim) คือส่วนเสี่ยงที่อาจถูกเรียกเงินคืน ผมแนะนำให้แก้ไขกลุ่มนี้ก่อนเป็นลำดับแรกครับ"
-        
+        return f"สถานะทางการเงินตอนนี้: **{summary_text}** ครับ \n\nสีแดง (Overclaim) คือความเสี่ยงถูกเรียกเงินคืนครับ"
     else:
-        # Default Response
-        return "ผมพร้อมให้คำปรึกษาครับ ท่านสามารถถามเกี่ยวกับ \n- วิธีแก้ Error วันที่ \n- การลงรหัสหัตถการ \n- หรือวิเคราะห์แนวโน้มการเงิน \n\nพิมพ์คำถามมาได้เลยครับ! 😊"
+        return "ผมพร้อมให้คำปรึกษาครับ พิมพ์คำถามได้เลย 😊"
 
 # --- 7. Pages ---
 
@@ -185,6 +171,7 @@ def login_page():
             if st.form_submit_button("เข้าสู่ระบบ (LOGIN)", use_container_width=True):
                 if st.session_state.u_input.lower().strip() == "hosnarai" and st.session_state.p_input.strip() == "h15000":
                     st.session_state.logged_in = True
+                    st.session_state.username = "Hosnarai" # Set username here
                     st.session_state.current_page = "upload"
                     st.rerun()
                 else:
@@ -266,37 +253,31 @@ def dashboard_page():
     with t3: st.dataframe(df[df['TYPE']=='IPD'], column_order=cols, column_config=cfg, use_container_width=True, height=500, hide_index=True)
 
 def chat_page():
-    # Header Chat
     st.markdown(f"""
     <div style="display:flex; align-items:center; margin-bottom:20px;">
         {LOGO_HTML}
         <div>
             <h2 style="margin:0; color:#0F172A;">AI Consultant</h2>
-            <p style="margin:0; color:#64748B;">ผู้ช่วยอัจฉริยะ ปรึกษาปัญหาการเบิกจ่ายและเวชระเบียน</p>
+            <p style="margin:0; color:#64748B;">ผู้ช่วยอัจฉริยะ</p>
         </div>
     </div>
     """, unsafe_allow_html=True)
     
     st.markdown("---")
 
-    # Chat Container
     for msg in st.session_state.chat_history:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
 
-    # Input
-    if prompt := st.chat_input("พิมพ์คำถามที่ต้องการปรึกษา... (เช่น วิธีแก้ Date Error, แนวโน้ม Impact)"):
-        # Show User Message
+    if prompt := st.chat_input("พิมพ์คำถามปรึกษา AI..."):
         st.session_state.chat_history.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.markdown(prompt)
 
-        # Generate AI Response
-        with st.spinner("AI กำลังค้นหาข้อมูลและระเบียบที่เกี่ยวข้อง..."):
-            time.sleep(1) # Fake thinking time
+        with st.spinner("AI กำลังคิด..."):
+            time.sleep(1)
             response = get_ai_response(prompt)
             
-        # Show AI Message
         st.session_state.chat_history.append({"role": "assistant", "content": response})
         with st.chat_message("assistant"):
             st.markdown(response)
@@ -305,7 +286,6 @@ def chat_page():
 def main():
     apply_theme()
     
-    # Sidebar Navigation
     with st.sidebar:
         st.markdown(LOGO_HTML, unsafe_allow_html=True)
         st.markdown("### SMART Audit AI")
@@ -315,22 +295,17 @@ def main():
             if st.button("📊 Dashboard"):
                 st.session_state.current_page = "dashboard"
                 st.rerun()
-            
-            # --- New Menu: AI Consultant ---
             if st.button("💬 AI Consultant"):
                 st.session_state.current_page = "chat"
                 st.rerun()
-            
             if st.button("📤 Upload Data"):
                 st.session_state.current_page = "upload"
                 st.rerun()
-                
             st.markdown("<br><br>", unsafe_allow_html=True)
             if st.button("Log out"):
                 st.session_state.clear()
                 st.rerun()
 
-    # Page Routing
     if not st.session_state.logged_in:
         login_page()
     elif st.session_state.current_page == "chat":
