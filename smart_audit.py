@@ -14,7 +14,13 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- 2. User Database & AI Config ---
+# --- 2. Shared Memory (ส่วนที่เพิ่มใหม่: กระดานกลางเก็บ Log) ---
+@st.cache_resource
+def get_shared_logs():
+    # ฟังก์ชันนี้จะสร้าง list กลางที่ใช้ร่วมกันทุกเครื่อง
+    return []
+
+# --- 3. User Database & AI Config ---
 USERS_DB = {
     "hosnarai": "h15000",   # Admin
     "doctor": "doc123",
@@ -41,7 +47,7 @@ except ImportError:
 except Exception as e:
     AI_ERROR_MSG = f"Error: {str(e)}"
 
-# --- 3. Resources ---
+# --- 4. Resources ---
 def get_base64_logo():
     p1 = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100" height="100">'
     p2 = '<path fill="#1565C0" d="M256 0C114.6 0 0 114.6 0 256s114.6 256 256 256 256-114.6 256-256S397.4 0 256 0zm0 472c-119.3 0-216-96.7-216-216S136.7 40 256 40s216 96.7 216 216-96.7 216-216 216z"/>'
@@ -52,7 +58,7 @@ def get_base64_logo():
 LOGO_HTML = f'<img src="data:image/svg+xml;base64,{get_base64_logo()}" width="100">'
 LOGO_SIDE = f'<img src="data:image/svg+xml;base64,{get_base64_logo()}" width="80" style="display:block;margin:0 auto 20px;">'
 
-# --- 4. CSS Styling ---
+# --- 5. CSS Styling ---
 def apply_theme():
     st.markdown("""
     <style>
@@ -70,7 +76,7 @@ def apply_theme():
     </style>
     """, unsafe_allow_html=True)
 
-# --- 5. Session State ---
+# --- 6. Session State ---
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 if 'username' not in st.session_state: st.session_state.username = ""
 if 'audit_data' not in st.session_state: st.session_state.audit_data = None
@@ -78,9 +84,8 @@ if 'summary' not in st.session_state: st.session_state.summary = {}
 if 'current_page' not in st.session_state: st.session_state.current_page = "login"
 if 'chat_history' not in st.session_state: 
     st.session_state.chat_history = [{"role": "assistant", "content": "สวัสดีครับ ผมคือ AI Consultant 🤖 พร้อมให้คำปรึกษาครับ"}]
-if 'access_logs' not in st.session_state: st.session_state.access_logs = []
 
-# --- 6. Logic Functions ---
+# --- 7. Logic Functions ---
 def process_data_mock(uploaded_files):
     bar = st.progress(0, text="Processing...")
     for i in range(100):
@@ -139,7 +144,7 @@ def get_ai_response(user_input):
         return res.text
     except Exception as e: return f"Error: {str(e)}"
 
-# --- 7. Components ---
+# --- 8. Components ---
 def render_card(title, value, sub, is_impact=False):
     color = "#1B5E20"
     if is_impact:
@@ -149,7 +154,7 @@ def render_card(title, value, sub, is_impact=False):
     html = f"""<div class="metric-card"><div style="font-size:14px; color:#666;">{title}</div><div style="font-size:28px; font-weight:800; margin-top:5px; color:{color};">{value}</div><div style="font-size:13px; margin-top:5px; color:{color};">{sub}</div></div>"""
     st.markdown(html, unsafe_allow_html=True)
 
-# --- 8. Pages ---
+# --- 9. Pages ---
 def login_page():
     c1, c2, c3 = st.columns([1, 1.5, 1])
     with c2:
@@ -170,9 +175,10 @@ def login_page():
                     st.session_state.username = u
                     st.session_state.current_page = "upload"
                     
-                    # LOGGING
+                    # LOGGING (บันทึกลง Shared Memory)
                     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    st.session_state.access_logs.append({"User": u, "Time": ts, "Status": "Login Success"})
+                    shared_logs = get_shared_logs() # เรียกกระดานกลาง
+                    shared_logs.append({"User": u, "Time": ts, "Status": "Login Success"})
                     
                     st.rerun()
                 else:
@@ -234,7 +240,7 @@ def chat_page():
         st.session_state.chat_history.append({"role":"assistant", "content":ans})
         with st.chat_message("assistant"): st.markdown(ans)
 
-# --- 9. Main ---
+# --- 10. Main ---
 def main():
     apply_theme()
     if st.session_state.logged_in:
@@ -261,9 +267,13 @@ def main():
     elif st.session_state.current_page == "chat": chat_page()
     elif st.session_state.current_page == "dashboard": dashboard_page()
     elif st.session_state.current_page == "logs":
-        st.markdown(f"<h2 style='color:#1B5E20;'>System Access Logs (Demo)</h2>", unsafe_allow_html=True)
-        if st.session_state.access_logs: st.dataframe(pd.DataFrame(st.session_state.access_logs), use_container_width=True)
-        else: st.info("No logs found.")
+        st.markdown(f"<h2 style='color:#1B5E20;'>System Access Logs (Shared)</h2>", unsafe_allow_html=True)
+        # ดึงข้อมูลจาก Shared Memory มาแสดง
+        shared_logs = get_shared_logs()
+        if shared_logs: 
+            st.dataframe(pd.DataFrame(shared_logs), use_container_width=True)
+        else: 
+            st.info("No logs found yet.")
         if st.button("⬅️ Back"): st.session_state.current_page = "upload"; st.rerun()
     else:
         upload_page()
